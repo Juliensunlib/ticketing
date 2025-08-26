@@ -7,13 +7,28 @@ import Dashboard from './components/Dashboard/Dashboard';
 import TicketForm from './components/Tickets/TicketForm';
 import TicketList from './components/Tickets/TicketList';
 import TicketDetail from './components/Tickets/TicketDetail';
+import GmailIntegration from './components/Gmail/GmailIntegration';
+import TicketFormFromEmail from './components/Tickets/TicketFormFromEmail';
 import Settings from './components/Settings/Settings';
 import { Ticket } from './types';
+
+interface Email {
+  id: string;
+  subject: string;
+  from: string;
+  date: string;
+  snippet: string;
+  body?: string;
+  hasAttachments: boolean;
+  isRead: boolean;
+}
 
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
   const [activeView, setActiveView] = useState('dashboard');
   const [showTicketForm, setShowTicketForm] = useState(false);
+  const [showEmailTicketForm, setShowEmailTicketForm] = useState(false);
+  const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
 
@@ -55,12 +70,31 @@ const AppContent: React.FC = () => {
     console.log('Ticket modifié avec succès !');
   };
 
+  const handleCreateTicketFromEmail = (email: Email) => {
+    setSelectedEmail(email);
+    setShowEmailTicketForm(true);
+  };
+
+  const handleCloseEmailTicketForm = () => {
+    setShowEmailTicketForm(false);
+    setSelectedEmail(null);
+  };
+
+  const handleEmailTicketFormSuccess = () => {
+    setShowEmailTicketForm(false);
+    setSelectedEmail(null);
+    setActiveView('tickets'); // Rediriger vers la liste des tickets
+    console.log('Ticket créé depuis email avec succès !');
+  };
+
   const renderContent = () => {
     switch (activeView) {
       case 'dashboard':
         return <Dashboard />;
       case 'tickets':
         return <TicketList onViewTicket={handleViewTicket} onEditTicket={handleEditTicket} />;
+      case 'emails':
+        return <GmailIntegration onCreateTicketFromEmail={handleCreateTicketFromEmail} />;
       case 'settings':
         return <Settings />;
       case 'analytics':
@@ -124,6 +158,14 @@ const AppContent: React.FC = () => {
           ticket={editingTicket}
           onClose={handleCloseEditTicket}
           onSuccess={handleEditTicketSuccess}
+        />
+      )}
+
+      {showEmailTicketForm && selectedEmail && (
+        <TicketFormFromEmail
+          email={selectedEmail}
+          onClose={handleCloseEmailTicketForm}
+          onSuccess={handleEmailTicketFormSuccess}
         />
       )}
     </div>
