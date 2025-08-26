@@ -73,78 +73,27 @@ const Dashboard: React.FC = () => {
         />
       </div>
 
-      {/* Graphique de répartition par priorité */}
+      {/* Répartition par statut */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Répartition par Priorité</h2>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Haute</span>
-              <div className="flex items-center space-x-2">
-                <div className="w-32 bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-red-500 h-2 rounded-full" 
-                    style={{ width: `${(highPriorityTickets / totalTickets) * 100}%` }}
-                  ></div>
-                </div>
-                <span className="text-sm font-medium text-gray-900">{highPriorityTickets}</span>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Moyenne</span>
-              <div className="flex items-center space-x-2">
-                <div className="w-32 bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-yellow-500 h-2 rounded-full" 
-                    style={{ width: `${(tickets.filter(t => t.priority === 'Moyenne').length / totalTickets) * 100}%` }}
-                  ></div>
-                </div>
-                <span className="text-sm font-medium text-gray-900">{tickets.filter(t => t.priority === 'Moyenne').length}</span>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Basse</span>
-              <div className="flex items-center space-x-2">
-                <div className="w-32 bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-green-500 h-2 rounded-full" 
-                    style={{ width: `${(tickets.filter(t => t.priority === 'Basse').length / totalTickets) * 100}%` }}
-                  ></div>
-                </div>
-                <span className="text-sm font-medium text-gray-900">{tickets.filter(t => t.priority === 'Basse').length}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Répartition par Origine</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Tickets par Statut</h2>
           <div className="space-y-3">
             {[
-              'SAV / question technique',
-              'Recouvrement', 
-              'Plainte Installateur',
-              'changement date prélèvement/RIB',
-              'Résiliation anticipée / cession de contrat',
-              'Ajout contrat / Flexibilité'
+              'Nouveau',
+              'En attente du client',
+              'En attente de l\'installateur',
+              'En attente retour service technique',
+              'Fermé',
+              'Ouvert'
             ].map((status) => {
               const count = tickets.filter(t => t.status === status).length;
-              const percentage = totalTickets > 0 ? (count / totalTickets) * 100 : 0;
               
               return (
-                <div key={status} className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600 truncate" title={status}>
-                    {status.length > 15 ? `${status.substring(0, 15)}...` : status}
+                <div key={status} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
+                  <span className="text-sm text-gray-600" title={status}>
+                    {status}
                   </span>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-20 bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-orange-500 h-2 rounded-full" 
-                        style={{ width: `${percentage}%` }}
-                      ></div>
-                    </div>
-                    <span className="text-sm font-medium text-gray-900 w-6 text-right">{count}</span>
-                  </div>
+                  <span className="text-lg font-bold text-gray-900">{count}</span>
                 </div>
               );
             })}
@@ -152,33 +101,39 @@ const Dashboard: React.FC = () => {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Volume par Type de Problème</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Répartition par Priorité</h2>
           <div className="space-y-3">
             {[
-              'SAV / question technique',
-              'Recouvrement', 
-              'Plainte Installateur',
-              'changement date prélèvement/RIB',
-              'Résiliation anticipée / cession de contrat',
-              'Ajout contrat / Flexibilité'
-            ].map((type) => {
-              const count = tickets.filter(t => t.type === type).length;
-              const percentage = totalTickets > 0 ? (count / totalTickets) * 100 : 0;
+              'Haute',
+              'Moyenne',
+              'Basse'
+            ].map((priority) => {
+              const count = tickets.filter(t => t.priority === priority).length;
               
               return (
-                <div key={type} className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600 truncate" title={type}>
-                    {type.length > 20 ? `${type.substring(0, 20)}...` : type}
-                  </span>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-20 bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-purple-500 h-2 rounded-full" 
-                        style={{ width: `${percentage}%` }}
-                      ></div>
-                    </div>
-                    <span className="text-sm font-medium text-gray-900 w-6 text-right">{count}</span>
-                  </div>
+                <div key={priority} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
+                  <span className="text-sm text-gray-600">{priority}</span>
+                  <span className="text-lg font-bold text-gray-900">{count}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Répartition par Origine</h2>
+          <div className="space-y-3">
+            {[
+              'Installateur',
+              'SunLib',
+              'Abonné'
+            ].map((origin) => {
+              const count = tickets.filter(t => t.origin === origin).length;
+              
+              return (
+                <div key={origin} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
+                  <span className="text-sm text-gray-600">{origin}</span>
+                  <span className="text-lg font-bold text-gray-900">{count}</span>
                 </div>
               );
             })}
