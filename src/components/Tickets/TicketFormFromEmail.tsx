@@ -28,8 +28,9 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
   
   const [subscriberSearch, setSubscriberSearch] = useState('');
   const [showSubscriberDropdown, setShowSubscriberDropdown] = useState(false);
+  const [subscriberType, setSubscriberType] = useState<'airtable' | 'manual' | 'other'>('airtable');
+  const [manualSubscriberName, setManualSubscriberName] = useState('');
   const [manualEmail, setManualEmail] = useState('');
-  const [useManualEmail, setUseManualEmail] = useState(false);
   
   const [formData, setFormData] = useState({
     title: email.subject,
@@ -54,6 +55,12 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
     const emailMatch = email.from.match(/<(.+)>/) || email.from.match(/([^\s<>]+@[^\s<>]+)/);
     const senderEmail = emailMatch ? emailMatch[1] || emailMatch[0] : email.from;
     setManualEmail(senderEmail);
+    
+    // Pré-remplir le nom de l'abonné depuis l'email si possible
+    const nameMatch = email.from.match(/^([^<]+)</);
+    if (nameMatch) {
+      setManualSubscriberName(nameMatch[1].trim());
+    }
   }, []);
 
   useEffect(() => {
@@ -90,7 +97,15 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
     const newErrors: Record<string, string> = {};
     if (!formData.title.trim()) newErrors.title = 'Le titre est obligatoire';
     if (!formData.description.trim()) newErrors.description = 'La description est obligatoire';
-    if (!formData.subscriberId.trim() && !useManualEmail) newErrors.subscriberId = 'Veuillez choisir un abonné ou utiliser un email manuel';
+    
+    // Validation selon le type d'abonné
+    if (subscriberType === 'airtable' && !formData.subscriberId.trim()) {
+      newErrors.subscriberId = 'Veuillez choisir un abonné dans la liste';
+    } else if (subscriberType === 'manual' && !manualSubscriberName.trim()) {
+      newErrors.subscriberId = 'Veuillez saisir le nom de l\'abonné';
+    } else if (subscriberType === 'other' && !manualEmail.trim()) {
+      newErrors.subscriberId = 'Veuillez saisir l\'adresse email';
+    }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -98,7 +113,16 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
     }
 
     try {
-      createTicket(formData);
+      // Préparer les données selon le type d'abonné
+      let ticketData = { ...formData };
+      
+      if (subscriberType === 'manual') {
+        ticketData.subscriberId = `${manualSubscriberName} (Manuel)`;
+      } else if (subscriberType === 'other') {
+        ticketData.subscriberId = `Autre - ${manualEmail}`;
+      }
+      
+      createTicket(ticketData);
       
       // Marquer l'email comme traité dans le localStorage
       const processedEmails = JSON.parse(localStorage.getItem('processed_emails') || '[]');
@@ -129,7 +153,6 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
     const subscriberDisplayName = `${subscriber.prenom} ${subscriber.nom} - ${subscriber.contratAbonne}`;
     setSubscriberSearch(subscriberDisplayName);
     setShowSubscriberDropdown(false);
-    setUseManualEmail(false);
     if (errors.subscriberId) {
       setErrors(prev => ({ ...prev, subscriberId: '' }));
     }
@@ -144,17 +167,14 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
     }
   };
 
-  const handleUseManualEmail = () => {
-    setUseManualEmail(true);
+  const handleSubscriberTypeChange = (type: 'airtable' | 'manual' | 'other') => {
+    setSubscriberType(type);
     setSubscriberSearch('');
     setFormData(prev => ({ ...prev, subscriberId: '' }));
     setShowSubscriberDropdown(false);
-  };
-
-  const handleBackToSubscriberList = () => {
-    setUseManualEmail(false);
-    setManualEmail('');
-    setSubscriberSearch('');
+    if (errors.subscriberId) {
+      setErrors(prev => ({ ...prev, subscriberId: '' }));
+    }
   };
 
   const handleChange = (field: string, value: string) => {
@@ -301,36 +321,53 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {useManualEmail ? 'Email de réponse *' : 'Abonné concerné *'}
+                  Abonné concerné *
                 </label>
                 
-                {useManualEmail ? (
-                  <div className="space-y-3">
-                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
-                      <p className="text-sm text-orange-800">
-                        📧 Mode email manuel - Les réponses seront envoyées à cette adresse
-                      </p>
-                    </div>
-                    <input
-                      type="email"
-                      value={manualEmail}
-                      onChange={(e) => setManualEmail(e.target.value)}
-                      placeholder="email@exemple.com"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                    />
+                {/* Sélecteur de type d'abonné */}
+                <div className="mb-4">
+                  <div className="flex space-x-2">
                     <button
                       type="button"
-                      onClick={handleBackToSubscriberList}
-                      className="text-sm text-orange-600 hover:text-orange-700 underline"
+                      onClick={() => handleSubscriberTypeChange('airtable')}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        subscriberType === 'airtable'
+                          ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
                     >
-                      ← Retour à la liste des abonnés
+                      📋 Liste Airtable
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSubscriberTypeChange('manual')}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        subscriberType === 'manual'
+                          ? 'bg-green-100 text-green-800 border border-green-300'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      ✏️ Saisie manuelle
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSubscriberTypeChange('other')}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        subscriberType === 'other'
+                          ? 'bg-orange-100 text-orange-800 border border-orange-300'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      📧 Autre (Email)
                     </button>
                   </div>
-                ) : (
+                </div>
+                
+                {subscriberType === 'airtable' && (
                   <div className="space-y-3">
                     <div className="relative">
                       <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                         <input
                           type="text"
                           value={subscriberSearch}
@@ -377,41 +414,74 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
                       )}
                     </div>
                     
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs text-gray-500">
-                        Choisissez un abonné dans la liste Airtable
-                      </p>
-                      <button
-                        type="button"
-                        onClick={handleUseManualEmail}
-                        className="text-sm text-orange-600 hover:text-orange-700 underline"
-                      >
-                        Utiliser un email manuel →
-                      </button>
-                    </div>
-                    
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                       <p className="text-sm text-blue-800">
-                        💡 <strong>Email source :</strong> {email.from}
-                      </p>
-                      <p className="text-xs text-blue-700 mt-1">
-                        Si cet abonné n'existe pas dans Airtable, utilisez "email manuel" pour pouvoir lui répondre directement.
+                        📋 Sélectionnez un abonné existant dans la base Airtable
                       </p>
                     </div>
                   </div>
                 )}
                 
-                {errors.subscriberId && <p className="text-red-500 text-sm mt-1">{errors.subscriberId}</p>}
-                
-                {/* Overlay pour fermer le dropdown */}
-                {showSubscriberDropdown && (
-                  <div 
-                    className="fixed inset-0 z-5"
-                    onClick={() => setShowSubscriberDropdown(false)}
-                  />
+                {subscriberType === 'manual' && (
+                  <div className="space-y-3">
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                      <p className="text-sm text-green-800">
+                        ✏️ <strong>Saisie manuelle</strong> - Pour un abonné non répertorié dans Airtable
+                      </p>
+                    </div>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                      <input
+                        type="text"
+                        value={manualSubscriberName}
+                        onChange={(e) => setManualSubscriberName(e.target.value)}
+                        placeholder="Nom et prénom de l'abonné"
+                        className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 ${
+                          errors.subscriberId ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Le nom sera enregistré tel que saisi. Les réponses par email devront être envoyées manuellement.
+                    </p>
+                  </div>
                 )}
-                      </div>
-                    )}
+                
+                {subscriberType === 'other' && (
+                  <div className="space-y-3">
+                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                      <p className="text-sm text-orange-800">
+                        📧 <strong>Client externe</strong> - Les réponses seront envoyées à cette adresse
+                      </p>
+                    </div>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                      <input
+                        type="email"
+                        value={manualEmail}
+                        onChange={(e) => setManualEmail(e.target.value)}
+                        placeholder="adresse@email.com"
+                        className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 ${
+                          errors.subscriberId ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Cette adresse sera utilisée pour les réponses par email depuis le système.
+                    </p>
+                  </div>
+                )}
+                
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-sm text-blue-800">
+                    💡 <strong>Email source :</strong> {email.from}
+                  </p>
+                  <p className="text-xs text-blue-700 mt-1">
+                    Email reçu de cette adresse. Choisissez le type d'abonné approprié ci-dessus.
+                  </p>
+                </div>
+                
+                {errors.subscriberId && <p className="text-red-500 text-sm mt-1">{errors.subscriberId}</p>}
               </div>
 
               <div>
@@ -433,14 +503,26 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
               </div>
 
               <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="text-sm font-medium text-gray-900 mb-2">Détection automatique :</h4>
-                <div className="space-y-1 text-xs text-gray-600">
-                  <p>• Abonné: À choisir manuellement dans la liste Airtable</p>
-                  <p>• Type: Détecté selon le contenu de l'email</p>
-                  <p>• Priorité: Détectée selon les mots-clés (urgent, panne, etc.)</p>
-                  <p>• Canal: Automatiquement défini sur "Mail"</p>
-                  <p>• Origine: Automatiquement définie sur "Abonné"</p>
-                  <p>• Email manuel: Si abonné non trouvé dans Airtable</p>
+                <h4 className="text-sm font-medium text-gray-900 mb-2">Types d'abonnés :</h4>
+                <div className="space-y-2 text-xs text-gray-600">
+                  <div className="flex items-start">
+                    <span className="w-6 h-4 flex-shrink-0">📋</span>
+                    <div>
+                      <strong>Liste Airtable :</strong> Abonnés existants dans votre base de données
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <span className="w-6 h-4 flex-shrink-0">✏️</span>
+                    <div>
+                      <strong>Saisie manuelle :</strong> Nouveau client non répertorié (réponse manuelle requise)
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <span className="w-6 h-4 flex-shrink-0">📧</span>
+                    <div>
+                      <strong>Autre (Email) :</strong> Client externe avec adresse email pour réponses automatiques
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -464,6 +546,14 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
             </button>
           </div>
         </form>
+
+        {/* Overlay pour fermer le dropdown */}
+        {showSubscriberDropdown && (
+          <div 
+            className="fixed inset-0 z-5"
+            onClick={() => setShowSubscriberDropdown(false)}
+          />
+        )}
       </div>
     </div>
   );
