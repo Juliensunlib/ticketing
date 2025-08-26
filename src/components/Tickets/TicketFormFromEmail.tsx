@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { Save, X, Mail, User, Calendar } from 'lucide-react';
+import { Save, X, Mail, User, Calendar, CheckCircle, AlertCircle } from 'lucide-react';
 import { useTickets } from '../../hooks/useTickets';
 import { useSupabaseUsers } from '../../hooks/useSupabaseUsers';
+import { useAirtable } from '../../hooks/useAirtable';
+import React, { useState, useEffect } from 'react';
 
 interface Email {
   id: string;
@@ -23,19 +25,18 @@ interface TicketFormFromEmailProps {
 const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClose, onSuccess }) => {
   const { createTicket } = useTickets();
   const { users: employees } = useSupabaseUsers();
+  const { getSubscriberByEmail } = useAirtable();
   
-  // Extraire le nom de l'abonné et le contrat depuis l'email si possible
-  const extractSubscriberInfo = (emailContent: string) => {
-    const contractMatch = emailContent.match(/contrat[:\s]*([A-Z]{2}-\d{6})/i);
-    const nameMatch = email.from.match(/^([^@]+)/);
-    
-    return {
-      contract: contractMatch ? contractMatch[1] : '',
-      name: nameMatch ? nameMatch[1].replace(/[._]/g, ' ') : email.from
-    };
-  };
-
-  const subscriberInfo = extractSubscriberInfo(email.body || email.snippet);
+  const [subscriberInfo, setSubscriberInfo] = useState<{
+    name: string;
+    contract: string;
+    found: boolean;
+  }>({
+    name: '',
+    contract: '',
+    found: false
+  });
+  const [loadingSubscriber, setLoadingSubscriber] = useState(true);
   
   const [formData, setFormData] = useState({
     title: email.subject,
@@ -46,10 +47,80 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
     origin: 'Abonné' as 'Installateur' | 'SunLib' | 'Abonné',
     channel: 'Mail' as 'Mail' | 'Téléphone' | 'Formulaire de contact' | 'Site abonné' | 'Application SunLib',
     assignedTo: '',
-    subscriberId: subscriberInfo.contract ? `${subscriberInfo.name} - ${subscriberInfo.contract}` : subscriberInfo.name
+    subscriberId: ''
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Rechercher l'abonné dans Airtable au chargement
+  useEffect(() => {
+    const searchSubscriber = async () => {
+      setLoadingSubscriber(true);
+      
+      // Extraire l'email de l'expéditeur
+      const emailMatch = email.from.match(/<(.+)>/) || email.from.match(/([^\s<>]+@[^\s<>]+)/);
+      const senderEmail = emailMatch ? emailMatch[1] || emailMatch[0] : email.from;
+      
+      console.log('🔍 Recherche abonné pour email:', senderEmail);
+      
+      try {
+        const subscriber = await getSubscriberByEmail(senderEmail);
+        
+        if (subscriber) {
+          const subscriberName = `${subscriber.prenom} ${subscriber.nom}`.trim();
+          const subscriberDisplay = subscriber.contratAbonne 
+            ? `${subscriberName} - ${subscriber.contratAbonne}`
+            : subscriberName;
+            
+          setSubscriberInfo({
+            name: subscriberName,
+            contract: subscriber.contratAbonne,
+            found: true
+          });
+          
+          setFormData(prev => ({
+            ...prev,
+            subscriberId: subscriberDisplay
+          }));
+          
+          console.log('✅ Abonné trouvé et assigné:', subscriberDisplay);
+        } else {
+          // Fallback : extraire le nom depuis l'email
+          const nameFromEmail = email.from.split('@')[0].replace(/[._]/g, ' ');
+          setSubscriberInfo({
+            name: nameFromEmail,
+            contract: '',
+            found: false
+          });
+          
+          setFormData(prev => ({
+            ...prev,
+            subscriberId: `${nameFromEmail} (${senderEmail})`
+          }));
+          
+          console.log('⚠️ Abonné non trouvé, utilisation du nom extrait:', nameFromEmail);
+        }
+      } catch (error) {
+        console.error('❌ Erreur recherche abonné:', error);
+        // Fallback en cas d'erreur
+        const nameFromEmail = email.from.split('@')[0].replace(/[._]/g, ' ');
+        setSubscriberInfo({
+          name: nameFromEmail,
+          contract: '',
+          found: false
+        });
+        
+        setFormData(prev => ({
+          ...prev,
+          subscriberId: `${nameFromEmail} (${email.from})`
+        }));
+      } finally {
+        setLoadingSubscriber(false);
+      }
+    };
+    
+    searchSubscriber();
+  }, [email.from, getSubscriberByEmail]);
 
   // Détection automatique du type de ticket basé sur le contenu
   React.useEffect(() => {
@@ -89,6 +160,12 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
 
     try {
       createTicket(formData);
+      
+      // Marquer l'email comme traité dans le localStorage
+      const processedEmails = JSON.parse(localStorage.getItem('processed_emails') || '[]');
+      processedEmails.push(email.id);
+      localStorage.setItem('processed_emails', JSON.stringify(processedEmails));
+      
       onSuccess();
       onClose();
     } catch (error) {
@@ -243,6 +320,42 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Abonné concerné *
                 </label>
+                
+                {loadingSubscriber ? (
+                  <div className="flex items-center p-3 bg-blue-50 rounded-lg">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
+                    <span className="text-sm text-blue-700">Recherche de l'abonné dans Airtable...</span>
+                  </div>
+                ) : (
+                  <>
+                    {subscriberInfo.found ? (
+                      <div className="mb-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-center">
+                          <CheckCircle className="w-4 h-4 text-green-500 mr-2" />
+                          <span className="text-sm text-green-800 font-medium">
+                            Abonné trouvé dans Airtable
+                          </span>
+                        </div>
+                        <div className="text-xs text-green-700 mt-1">
+                          {subscriberInfo.name} {subscriberInfo.contract && `- ${subscriberInfo.contract}`}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mb-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <div className="flex items-center">
+                          <AlertCircle className="w-4 h-4 text-yellow-500 mr-2" />
+                          <span className="text-sm text-yellow-800 font-medium">
+                            Abonné non trouvé dans Airtable
+                          </span>
+                        </div>
+                        <div className="text-xs text-yellow-700 mt-1">
+                          Email: {email.from} - Vérifiez que l'email existe dans la base Airtable
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+                
                 <input
                   type="text"
                   value={formData.subscriberId}
@@ -251,11 +364,17 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
                     errors.subscriberId ? 'border-red-500' : 'border-gray-300'
                   }`}
                   placeholder="Nom de l'abonné - Contrat"
+                  disabled={loadingSubscriber}
                 />
                 {errors.subscriberId && <p className="text-red-500 text-sm mt-1">{errors.subscriberId}</p>}
-                <p className="text-xs text-gray-500 mt-1">
-                  Extrait automatiquement de l'email. Modifiez si nécessaire.
-                </p>
+                {!loadingSubscriber && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {subscriberInfo.found 
+                      ? "Abonné trouvé automatiquement dans Airtable. Modifiez si nécessaire."
+                      : "Abonné non trouvé dans Airtable. Saisissez manuellement les informations."
+                    }
+                  </p>
+                )}
               </div>
 
               <div>

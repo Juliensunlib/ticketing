@@ -20,6 +20,7 @@ interface GmailIntegrationProps {
 
 const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromEmail }) => {
   const [emails, setEmails] = useState<Email[]>([]);
+  const [processedEmails, setProcessedEmails] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -28,6 +29,19 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
   const [showReplyForm, setShowReplyForm] = useState(false);
   const [replyContent, setReplyContent] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
+
+  // Charger les emails traités depuis le localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem('processed_emails');
+    if (stored) {
+      setProcessedEmails(new Set(JSON.parse(stored)));
+    }
+  }, []);
+
+  // Sauvegarder les emails traités
+  const saveProcessedEmails = (emailIds: Set<string>) => {
+    localStorage.setItem('processed_emails', JSON.stringify([...emailIds]));
+  };
 
   // Vérifier l'authentification au chargement
   useEffect(() => {
@@ -128,6 +142,12 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
   };
 
   const handleCreateTicket = (email: Email) => {
+    // Marquer l'email comme traité
+    const newProcessedEmails = new Set(processedEmails);
+    newProcessedEmails.add(email.id);
+    setProcessedEmails(newProcessedEmails);
+    saveProcessedEmails(newProcessedEmails);
+
     if (onCreateTicketFromEmail) {
       onCreateTicketFromEmail(email);
     } else {
@@ -177,9 +197,11 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
   };
 
   const filteredEmails = emails.filter(email =>
-    email.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    email.from.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    email.snippet.toLowerCase().includes(searchTerm.toLowerCase())
+    !processedEmails.has(email.id) && (
+      email.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      email.from.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      email.snippet.toLowerCase().includes(searchTerm.toLowerCase())
+    )
   );
 
   const formatDate = (dateString: string) => {
@@ -208,6 +230,7 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
   };
 
   const unreadCount = emails.filter(email => !email.isRead).length;
+  const processedCount = emails.filter(email => processedEmails.has(email.id)).length;
 
   // Interface de connexion
   if (!isAuthenticated) {
@@ -323,6 +346,16 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
               Actualiser
             </button>
             <button
+              onClick={() => {
+                setProcessedEmails(new Set());
+                localStorage.removeItem('processed_emails');
+              }}
+              className="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors text-sm"
+              title="Réafficher tous les emails"
+            >
+              Réinitialiser
+            </button>
+            <button
               onClick={handleLogout}
               className="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors"
             >
@@ -331,7 +364,7 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
           </div>
         </div>
         <div className="text-sm text-gray-600">
-          abonne@sunlib.fr • {emails.length} email{emails.length !== 1 ? 's' : ''} • {unreadCount} non lu{unreadCount !== 1 ? 's' : ''}
+          abonne@sunlib.fr • {emails.length} email{emails.length !== 1 ? 's' : ''} • {unreadCount} non lu{unreadCount !== 1 ? 's' : ''} • {processedCount} traité{processedCount !== 1 ? 's' : ''}
         </div>
       </div>
 
@@ -408,8 +441,9 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
                         e.stopPropagation();
                         handleCreateTicket(email);
                       }}
-                      className="text-xs px-2 py-1 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded transition-colors"
+                      className="text-xs px-2 py-1 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded transition-colors flex items-center"
                     >
+                      <Plus className="w-3 h-3 mr-1" />
                       Créer ticket
                     </button>
                   </div>
