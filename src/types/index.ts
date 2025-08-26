@@ -42,6 +42,7 @@ export interface Subscriber {
   nomEntreprise?: string;
   installateur?: string;
   lienCRM?: string;
+  email?: string;
 }
 
 export interface AirtableConfig {

@@ -2,6 +2,7 @@ import { Save, X, Mail, User, Calendar, CheckCircle, AlertCircle } from 'lucide-
 import { useTickets } from '../../hooks/useTickets';
 import { useSupabaseUsers } from '../../hooks/useSupabaseUsers';
 import { useAirtable } from '../../hooks/useAirtable';
+import { Search } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
 interface Email {
@@ -28,7 +29,7 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
   
   const [subscriberSearch, setSubscriberSearch] = useState('');
   const [showSubscriberDropdown, setShowSubscriberDropdown] = useState(false);
-  const [subscriberType, setSubscriberType] = useState<'airtable' | 'manual' | 'other'>('airtable');
+  const [subscriberType, setSubscriberType] = useState<'airtable' | 'email'>('email');
   const [manualSubscriberName, setManualSubscriberName] = useState('');
   const [manualEmail, setManualEmail] = useState('');
   
@@ -60,6 +61,24 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
     const nameMatch = email.from.match(/^([^<]+)</);
     if (nameMatch) {
       setManualSubscriberName(nameMatch[1].trim());
+    }
+    
+    // Essayer de trouver automatiquement l'abonné dans Airtable par email
+    if (senderEmail && subscribers.length > 0) {
+      const foundSubscriber = subscribers.find(sub => 
+        sub.email && sub.email.toLowerCase() === senderEmail.toLowerCase()
+      );
+      
+      if (foundSubscriber) {
+        console.log('✅ Abonné trouvé automatiquement dans Airtable:', foundSubscriber);
+        setSubscriberType('airtable');
+        const subscriberDisplayName = `${foundSubscriber.prenom} ${foundSubscriber.nom} - ${foundSubscriber.contratAbonne}`;
+        setSubscriberSearch(subscriberDisplayName);
+        setFormData(prev => ({ ...prev, subscriberId: foundSubscriber.id }));
+      } else {
+        console.log('ℹ️ Abonné non trouvé dans Airtable, utilisation de l\'email');
+        setSubscriberType('email');
+      }
     }
   }, []);
 
@@ -101,9 +120,7 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
     // Validation selon le type d'abonné
     if (subscriberType === 'airtable' && !formData.subscriberId.trim()) {
       newErrors.subscriberId = 'Veuillez choisir un abonné dans la liste';
-    } else if (subscriberType === 'manual' && !manualSubscriberName.trim()) {
-      newErrors.subscriberId = 'Veuillez saisir le nom de l\'abonné';
-    } else if (subscriberType === 'other' && !manualEmail.trim()) {
+    } else if (subscriberType === 'email' && !manualEmail.trim()) {
       newErrors.subscriberId = 'Veuillez saisir l\'adresse email';
     }
 
@@ -116,10 +133,12 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
       // Préparer les données selon le type d'abonné
       let ticketData = { ...formData };
       
-      if (subscriberType === 'manual') {
-        ticketData.subscriberId = `${manualSubscriberName} (Manuel)`;
-      } else if (subscriberType === 'other') {
-        ticketData.subscriberId = `Autre - ${manualEmail}`;
+      if (subscriberType === 'email') {
+        // Utiliser le nom extrait de l'email + l'adresse email
+        const displayName = manualSubscriberName ? 
+          `${manualSubscriberName} <${manualEmail}>` : 
+          manualEmail;
+        ticketData.subscriberId = displayName;
       }
       
       createTicket(ticketData);
@@ -167,7 +186,7 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
     }
   };
 
-  const handleSubscriberTypeChange = (type: 'airtable' | 'manual' | 'other') => {
+  const handleSubscriberTypeChange = (type: 'airtable' | 'email') => {
     setSubscriberType(type);
     setSubscriberSearch('');
     setFormData(prev => ({ ...prev, subscriberId: '' }));
@@ -336,44 +355,38 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
-                      📋 Liste Airtable
+                      📋 Client Airtable
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleSubscriberTypeChange('manual')}
+                      onClick={() => handleSubscriberTypeChange('email')}
                       className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        subscriberType === 'manual'
-                          ? 'bg-green-100 text-green-800 border border-green-300'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      ✏️ Saisie manuelle
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleSubscriberTypeChange('other')}
-                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        subscriberType === 'other'
+                        subscriberType === 'email'
                           ? 'bg-orange-100 text-orange-800 border border-orange-300'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
-                      📧 Autre (Email)
+                      📧 Adresse Email
                     </button>
                   </div>
                 </div>
                 
                 {subscriberType === 'airtable' && (
                   <div className="space-y-3">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <p className="text-sm text-blue-800">
+                        📋 <strong>Client Airtable</strong> - Sélectionnez un abonné existant dans votre base de données
+                      </p>
+                    </div>
                     <div className="relative">
                       <div className="relative">
-                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                         <input
                           type="text"
                           value={subscriberSearch}
                           onChange={(e) => handleSubscriberSearchChange(e.target.value)}
                           onFocus={() => setShowSubscriberDropdown(true)}
-                          placeholder={subscribers.length === 0 ? 'Chargement des abonnés...' : 'Rechercher un abonné...'}
+                          placeholder={subscribers.length === 0 ? 'Chargement des clients...' : 'Rechercher par nom, prénom ou contrat...'}
                           className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 ${
                             errors.subscriberId ? 'border-red-500' : 'border-gray-300'
                           }`}
@@ -402,35 +415,160 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
                                   {subscriber.installateur && (
                                     <span className="ml-2 text-blue-600">- {subscriber.installateur}</span>
                                   )}
+                                  {subscriber.email && (
+                                    <span className="ml-2 text-green-600">📧 {subscriber.email}</span>
+                                  )}
                                 </div>
                               </button>
                             ))
                           ) : (
                             <div className="px-4 py-3 text-gray-500 text-center">
-                              Aucun abonné trouvé pour "{subscriberSearch}"
+                              <div>Aucun client trouvé pour "{subscriberSearch}"</div>
+                              <button
+                                type="button"
+                                onClick={() => handleSubscriberTypeChange('email')}
+                                className="mt-2 text-sm text-orange-600 hover:text-orange-700 underline"
+                              >
+                                Utiliser l'adresse email à la place
+                              </button>
                             </div>
                           )}
                         </div>
                       )}
                     </div>
-                    
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <p className="text-sm text-blue-800">
-                        📋 Sélectionnez un abonné existant dans la base Airtable
-                      </p>
-                    </div>
                   </div>
                 )}
                 
-                {subscriberType === 'manual' && (
+                {subscriberType === 'email' && (
                   <div className="space-y-3">
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                      <p className="text-sm text-green-800">
-                        ✏️ <strong>Saisie manuelle</strong> - Pour un abonné non répertorié dans Airtable
+                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                      <p className="text-sm text-orange-800">
+                        📧 <strong>Adresse Email</strong> - Pour un client non répertorié dans Airtable
                       </p>
                     </div>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Nom du client (optionnel)
+                      </label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        <input
+                          type="text"
+                          value={manualSubscriberName}
+                          onChange={(e) => setManualSubscriberName(e.target.value)}
+                          placeholder="Nom et prénom du client"
+                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Adresse email *
+                      </label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        <input
+                          type="email"
+                          value={manualEmail}
+                          onChange={(e) => setManualEmail(e.target.value)}
+                          placeholder="adresse@email.com"
+                          className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 ${
+                            errors.subscriberId ? 'border-red-500' : 'border-gray-300'
+                          }`}
+                        />
+                      </div>
+                    </div>
+                    
+                    {subscribers.length > 0 && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <p className="text-sm text-blue-800 mb-2">
+                          💡 <strong>Suggestion :</strong> Vérifiez si ce client existe dans Airtable
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleSubscriberTypeChange('airtable');
+                            setSubscriberSearch(manualEmail);
+                            setShowSubscriberDropdown(true);
+                          }}
+                          className="text-sm text-blue-600 hover:text-blue-700 underline"
+                        >
+                          Rechercher "{manualEmail}" dans la base Airtable
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-sm text-blue-800">
+                    💡 <strong>Email source :</strong> {email.from}
+                  </p>
+                  <p className="text-xs text-blue-700 mt-1">
+                    {subscriberType === 'airtable' ? 
+                      'Les réponses seront envoyées à l\'email du client Airtable' :
+                      'Les réponses seront envoyées à cette adresse email'
+                    }
+                  </p>
+                </div>
+                
+                {errors.subscriberId && <p className="text-red-500 text-sm mt-1">{errors.subscriberId}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Assigné à
+                </label>
+                <select
+                  value={formData.assignedTo}
+                  onChange={(e) => handleChange('assignedTo', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                >
+                  <option value="">Non assigné</option>
+                  {employees.map((employee) => (
+                    <option key={employee.id} value={employee.id}>
+                      {employee.name} - {employee.user_group}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors flex items-center"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              Créer le Ticket
+            </button>
+          </div>
+        </form>
+
+        {/* Overlay pour fermer le dropdown */}
+        {showSubscriberDropdown && (
+          <div 
+            className="fixed inset-0 z-5"
+            onClick={() => setShowSubscriberDropdown(false)}
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default TicketFormFromEmail;
                       <input
                         type="text"
                         value={manualSubscriberName}
