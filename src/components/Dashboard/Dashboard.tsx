@@ -87,22 +87,22 @@ const Dashboard: React.FC = () => {
       {/* Répartition par statut */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Tickets par Statut</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Total par Type</h2>
           <div className="space-y-3">
             {[
-              'Nouveau',
-              'En attente du client',
-              'En attente de l\'installateur',
-              'En attente retour service technique',
-              'Fermé',
-              'Ouvert'
-            ].map((status) => {
-              const count = tickets.filter(t => t.status === status).length;
+              'SAV / question technique',
+              'Recouvrement',
+              'Plainte Installateur',
+              'changement date prélèvement/RIB',
+              'Résiliation anticipée / cession de contrat',
+              'Ajout contrat / Flexibilité'
+            ].map((type) => {
+              const count = tickets.filter(t => t.type === type).length;
               
               return (
-                <div key={status} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
-                  <span className="text-sm text-gray-600" title={status}>
-                    {status}
+                <div key={type} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
+                  <span className="text-sm text-gray-600" title={type}>
+                    {type}
                   </span>
                   <span className="text-lg font-bold text-gray-900">{count}</span>
                 </div>
@@ -112,7 +112,7 @@ const Dashboard: React.FC = () => {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Répartition par Priorité</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Total par Priorité</h2>
           <div className="space-y-3">
             {[
               'Haute',
@@ -132,7 +132,7 @@ const Dashboard: React.FC = () => {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Répartition par Origine</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Total par Origine</h2>
           <div className="space-y-3">
             {[
               'Installateur',
