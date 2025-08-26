@@ -106,19 +106,6 @@ const LoginForm: React.FC = () => {
             </button>
           </form>
 
-          {/* Informations de test */}
-          <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <h4 className="text-sm font-medium text-blue-900 mb-2">Pour créer des comptes de test :</h4>
-            <div className="text-xs text-blue-800 space-y-1">
-              <p>1. Allez dans votre dashboard Supabase</p>
-              <p>2. Section <strong>Authentication → Users</strong></p>
-              <p>3. Cliquez sur <strong>"Add user"</strong></p>
-              <p>4. Créez vos comptes avec email/mot de passe</p>
-              <p className="text-blue-600 mt-2">
-                Les utilisateurs apparaîtront automatiquement dans la liste d'assignation
-              </p>
-            </div>
-          </div>
         </div>
       </div>
     </div>
