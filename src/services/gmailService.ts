@@ -46,7 +46,11 @@ class GmailService {
     this.scope = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send';
     
     // Charger les tokens sauvegardés au démarrage
-    this.loadStoredTokens();
+    try {
+      this.loadStoredTokens();
+    } catch (error) {
+      console.error('Erreur lors du chargement des tokens:', error);
+    }
     
     console.log('🔧 Gmail Service initialisé pour abonne@sunlib.fr');
   }
@@ -121,16 +125,23 @@ class GmailService {
   }
 
   private loadStoredTokens(): void {
-    this.accessToken = localStorage.getItem('gmail_access_token');
-    this.refreshToken = localStorage.getItem('gmail_refresh_token');
-    const expiresAt = localStorage.getItem('gmail_token_expires_at');
-    
-    if (expiresAt) {
-      this.tokenExpiresAt = parseInt(expiresAt);
-    }
-    
-    if (this.accessToken) {
-      console.log('✅ Tokens chargés depuis le stockage local');
+    try {
+      this.accessToken = localStorage.getItem('gmail_access_token');
+      this.refreshToken = localStorage.getItem('gmail_refresh_token');
+      const expiresAt = localStorage.getItem('gmail_token_expires_at');
+      
+      if (expiresAt) {
+        this.tokenExpiresAt = parseInt(expiresAt);
+      }
+      
+      if (this.accessToken) {
+        console.log('✅ Tokens chargés depuis le stockage local');
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement des tokens depuis localStorage:', error);
+      this.accessToken = null;
+      this.refreshToken = null;
+      this.tokenExpiresAt = 0;
     }
   }
 
@@ -188,11 +199,21 @@ class GmailService {
   }
 
   isAuthenticated(): boolean {
-    return !!(this.accessToken && this.tokenExpiresAt > Date.now());
+    try {
+      return !!(this.accessToken && this.tokenExpiresAt > Date.now());
+    } catch (error) {
+      console.error('Erreur lors de la vérification de l\'authentification:', error);
+      return false;
+    }
   }
 
   async makeGmailRequest(endpoint: string, method: 'GET' | 'POST' = 'GET', body?: any): Promise<any> {
-    await this.ensureValidToken();
+    try {
+      await this.ensureValidToken();
+    } catch (error) {
+      console.error('Erreur lors de la validation du token:', error);
+      throw error;
+    }
 
     const options: RequestInit = {
       method,
@@ -347,17 +368,26 @@ class GmailService {
 
   logout(): void {
     console.log('🚪 Déconnexion Gmail');
-    this.accessToken = null;
-    this.refreshToken = null;
-    this.tokenExpiresAt = 0;
-    localStorage.removeItem('gmail_access_token');
-    localStorage.removeItem('gmail_refresh_token');
-    localStorage.removeItem('gmail_token_expires_at');
+    try {
+      this.accessToken = null;
+      this.refreshToken = null;
+      this.tokenExpiresAt = 0;
+      localStorage.removeItem('gmail_access_token');
+      localStorage.removeItem('gmail_refresh_token');
+      localStorage.removeItem('gmail_token_expires_at');
+    } catch (error) {
+      console.error('Erreur lors de la suppression des tokens:', error);
+    }
   }
 
   // Méthode pour vérifier si on a besoin d'une authentification
   needsAuthentication(): boolean {
-    return !this.isAuthenticated();
+    try {
+      return !this.isAuthenticated();
+    } catch (error) {
+      console.error('Erreur lors de la vérification du besoin d\'authentification:', error);
+      return true;
+    }
   }
 }
 

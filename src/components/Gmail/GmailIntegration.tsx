@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Plus, Search, RefreshCw, Calendar, User, Paperclip, ExternalLink, Key, CheckCircle, AlertCircle, Send } from 'lucide-react';
+import { Mail, Plus, Search, RefreshCw, Calendar, User, Paperclip, ExternalLink, Key, CheckCircle, AlertCircle, Send, X } from 'lucide-react';
 import gmailService from '../../services/gmailService';
 
 interface Email {
@@ -32,9 +32,14 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
 
   // Charger les emails traités depuis le localStorage
   useEffect(() => {
-    const stored = localStorage.getItem('processed_emails');
-    if (stored) {
-      setProcessedEmails(new Set(JSON.parse(stored)));
+    try {
+      const stored = localStorage.getItem('processed_emails');
+      if (stored) {
+        setProcessedEmails(new Set(JSON.parse(stored)));
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement des emails traités:', error);
+      setProcessedEmails(new Set());
     }
   }, []);
 
@@ -45,26 +50,55 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
 
   // Vérifier l'authentification au chargement
   useEffect(() => {
-    checkAuthentication();
-    
-    // Écouter les changements d'URL pour capturer le code d'autorisation
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    
-    if (code) {
-      handleAuthCallback(code);
-    }
+    const initializeGmail = async () => {
+      try {
+        checkAuthentication();
+        
+        // Écouter les changements d'URL pour capturer le code d'autorisation
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        
+        if (code) {
+          await handleAuthCallback(code);
+        }
+      } catch (error) {
+        console.error('Erreur lors de l\'initialisation Gmail:', error);
+        setAuthError('Erreur lors de l\'initialisation de Gmail');
+        setLoading(false);
+      }
+    };
+
+    initializeGmail();
   }, []);
 
+  // Effet séparé pour gérer l'état de chargement initial
+  useEffect(() => {
+    // S'assurer que loading est false après l'initialisation
+    const timer = setTimeout(() => {
+      if (loading && !isAuthenticated) {
+        setLoading(false);
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [loading, isAuthenticated]);
+
   const checkAuthentication = () => {
-    const authenticated = gmailService.isAuthenticated();
-    setIsAuthenticated(authenticated);
-    
-    if (authenticated) {
-      console.log('✅ Utilisateur déjà authentifié, chargement des emails...');
-      loadEmails();
-    } else {
-      console.log('🔑 Authentification requise');
+    try {
+      const authenticated = gmailService.isAuthenticated();
+      setIsAuthenticated(authenticated);
+      
+      if (authenticated) {
+        console.log('✅ Utilisateur déjà authentifié, chargement des emails...');
+        loadEmails();
+      } else {
+        console.log('🔑 Authentification requise');
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error('Erreur lors de la vérification de l\'authentification:', error);
+      setIsAuthenticated(false);
+      setLoading(false);
     }
   };
 
@@ -93,19 +127,25 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
   };
 
   const handleGmailAuth = () => {
-    if (!gmailService.isConfigured()) {
-      setAuthError('Configuration Gmail manquante. Vérifiez vos variables d\'environnement.');
-      return;
-    }
+    try {
+      if (!gmailService.isConfigured()) {
+        setAuthError('Configuration Gmail manquante. Vérifiez vos variables d\'environnement.');
+        return;
+      }
 
-    const authUrl = gmailService.getAuthUrl();
-    console.log('🔗 Redirection vers:', authUrl);
-    window.location.href = authUrl;
+      const authUrl = gmailService.getAuthUrl();
+      console.log('🔗 Redirection vers:', authUrl);
+      window.location.href = authUrl;
+    } catch (error) {
+      console.error('Erreur lors de l\'authentification Gmail:', error);
+      setAuthError('Erreur lors de l\'authentification Gmail');
+    }
   };
 
   const loadEmails = async () => {
     if (!isAuthenticated) {
       console.log('❌ Non authentifié, impossible de charger les emails');
+      setLoading(false);
       return;
     }
 
@@ -125,6 +165,10 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
       if (error instanceof Error && error.message === 'NEED_AUTH') {
         setIsAuthenticated(false);
         setAuthError('Session expirée. Veuillez vous reconnecter.');
+      } else if (error instanceof Error && error.message.includes('Failed to fetch')) {
+        setAuthError('Impossible de se connecter à Gmail. Vérifiez votre connexion internet.');
+      } else if (error instanceof Error && error.message.includes('401')) {
+        setAuthError('Session expirée. Veuillez vous reconnecter.');
       } else {
         setAuthError(`Erreur lors du chargement: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
       }
@@ -134,10 +178,17 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
   };
 
   const handleRefresh = () => {
-    if (isAuthenticated) {
-      loadEmails();
-    } else {
-      checkAuthentication();
+    try {
+      setAuthError(null);
+      if (isAuthenticated) {
+        loadEmails();
+      } else {
+        checkAuthentication();
+      }
+    } catch (error) {
+      console.error('Erreur lors de l\'actualisation:', error);
+      setAuthError('Erreur lors de l\'actualisation');
+      setLoading(false);
     }
   };
 
@@ -198,12 +249,17 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
   };
 
   const handleLogout = () => {
-    gmailService.logout();
-    setIsAuthenticated(false);
-    setEmails([]);
-    setSelectedEmail(null);
-    setAuthError(null);
-    console.log('🚪 Déconnexion effectuée');
+    try {
+      gmailService.logout();
+      setIsAuthenticated(false);
+      setEmails([]);
+      setSelectedEmail(null);
+      setAuthError(null);
+      setLoading(false);
+      console.log('🚪 Déconnexion effectuée');
+    } catch (error) {
+      console.error('Erreur lors de la déconnexion:', error);
+    }
   };
 
   const markAsRead = (emailId: string) => {
@@ -249,6 +305,24 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
 
   const unreadCount = emails.filter(email => !email.isRead).length;
   const processedCount = emails.filter(email => processedEmails.has(email.id)).length;
+
+  // Gestion de l'état de chargement initial
+  if (loading && emails.length === 0 && !authError) {
+    return (
+      <div className="p-6 space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Emails Abonnés</h1>
+          <p className="text-gray-600">Chargement en cours...</p>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+            <p className="text-gray-600">Initialisation de Gmail...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Interface de connexion
   if (!isAuthenticated) {
@@ -416,6 +490,14 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
                 <p className="text-gray-600">
                   {searchTerm ? 'Aucun email trouvé pour cette recherche' : 'Aucun email dans votre boîte de réception'}
                 </p>
+                {!loading && emails.length === 0 && !authError && (
+                  <button
+                    onClick={handleRefresh}
+                    className="mt-4 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors"
+                  >
+                    Actualiser
+                  </button>
+                )}
               </div>
             ) : (
               filteredEmails.map((email) => (
