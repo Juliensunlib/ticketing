@@ -6,12 +6,13 @@ import { useTickets } from '../../hooks/useTickets';
 const Dashboard: React.FC = () => {
   const { tickets } = useTickets();
 
-  // Calcul des statistiques
-  const totalTickets = tickets.length;
-  const openTickets = tickets.filter(t => t.status === 'Ouvert').length;
-  const inProgressTickets = tickets.filter(t => t.status === 'En cours').length;
-  const closedTickets = tickets.filter(t => t.status === 'Fermé').length;
-  const highPriorityTickets = tickets.filter(t => t.priority === 'Haute').length;
+  // Calcul des statistiques par statut
+  const nouveauTickets = tickets.filter(t => t.status === 'Nouveau').length;
+  const attenteClientTickets = tickets.filter(t => t.status === 'En attente du client').length;
+  const attenteInstallateurTickets = tickets.filter(t => t.status === 'En attente de l\'installateur').length;
+  const attenteServiceTickets = tickets.filter(t => t.status === 'En attente retour service technique').length;
+  const fermeTickets = tickets.filter(t => t.status === 'Fermé').length;
+  const ouvertTickets = tickets.filter(t => t.status === 'Ouvert').length;
 
   const recentTickets = tickets
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -43,33 +44,43 @@ const Dashboard: React.FC = () => {
         <p className="text-gray-600">Vue d'ensemble de l'activité des tickets</p>
       </div>
 
-      {/* Statistiques */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Statistiques par statut */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <StatsCard
-          title="Total Tickets"
-          value={totalTickets}
-          icon={Ticket}
-          color="blue"
-          trend={{ value: 12, isPositive: true }}
-        />
-        <StatsCard
-          title="En Cours"
-          value={inProgressTickets}
+          title="Nouveau"
+          value={nouveauTickets}
           icon={AlertCircle}
           color="blue"
         />
         <StatsCard
-          title="Tickets Ouverts"
-          value={openTickets}
+          title="Attente Client"
+          value={attenteClientTickets}
           icon={Clock}
           color="yellow"
         />
         <StatsCard
-          title="Fermés"
-          value={closedTickets}
+          title="Attente Installateur"
+          value={attenteInstallateurTickets}
+          icon={Clock}
+          color="red"
+        />
+        <StatsCard
+          title="Attente Service"
+          value={attenteServiceTickets}
+          icon={Clock}
+          color="purple"
+        />
+        <StatsCard
+          title="Fermé"
+          value={fermeTickets}
+          icon={CheckCircle}
+          color="red"
+        />
+        <StatsCard
+          title="Ouvert"
+          value={ouvertTickets}
           icon={CheckCircle}
           color="green"
-          trend={{ value: 8, isPositive: true }}
         />
       </div>
 
