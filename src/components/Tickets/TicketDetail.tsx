@@ -189,7 +189,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose }) => {
                   <div className="flex items-center justify-between py-2">
                     <span className="text-sm text-gray-600">Créé par</span>
                     <span className="text-sm font-medium text-gray-900">
-                      {ticket.createdBy}
+                      {ticket.createdBy || 'Utilisateur inconnu'}
                     </span>
                   </div>
                 </div>
@@ -319,12 +319,12 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose }) => {
                   onChange={(e) => setEditData(prev => ({ ...prev, status: e.target.value as any }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 >
-                  <option value="SAV / question technique">SAV / question technique</option>
-                  <option value="Recouvrement">Recouvrement</option>
-                  <option value="Plainte Installateur">Plainte Installateur</option>
-                  <option value="changement date prélèvement/RIB">changement date prélèvement/RIB</option>
-                  <option value="Résiliation anticipée / cession de contrat">Résiliation anticipée / cession de contrat</option>
-                  <option value="Ajout contrat / Flexibilité">Ajout contrat / Flexibilité</option>
+                  <option value="Nouveau">Nouveau</option>
+                  <option value="En attente du client">En attente du client</option>
+                  <option value="En attente de l'installateur">En attente de l'installateur</option>
+                  <option value="En attente retour service technique">En attente retour service technique</option>
+                  <option value="Fermé">Fermé</option>
+                  <option value="Ouvert">Ouvert</option>
                 </select>
               </div>
 
