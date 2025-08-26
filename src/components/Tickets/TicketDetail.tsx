@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { X, Edit, MessageCircle, Paperclip, Clock, User, Building, Phone, Mail, Calendar, Tag, AlertCircle, ExternalLink } from 'lucide-react';
+import { X, Edit, MessageCircle, Paperclip, Clock, User, Building, Phone, Mail, Calendar, Tag, AlertCircle, ExternalLink, Send, Plus } from 'lucide-react';
 import { Ticket } from '../../types';
 import { useTickets } from '../../hooks/useTickets';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSupabaseUsers } from '../../hooks/useSupabaseUsers';
 import { useAirtable } from '../../hooks/useAirtable';
+import gmailService from '../../services/gmailService';
 
 interface TicketDetailProps {
   ticket: Ticket;
@@ -18,11 +19,16 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose }) => {
   const { subscribers } = useAirtable();
   const [newComment, setNewComment] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+  const [commentType, setCommentType] = useState<'comment' | 'email'>('comment');
+  const [emailSubject, setEmailSubject] = useState('');
+  const [sendingComment, setSendingComment] = useState(false);
   const [editData, setEditData] = useState({
     status: ticket.status,
     priority: ticket.priority,
     assignedTo: ticket.assignedTo || ''
   });
+  const [showEmailReply, setShowEmailReply] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   // Utiliser le ticket mis à jour depuis l'état global au lieu de la prop
   const currentTicket = tickets.find(t => t.id === ticket.id) || ticket;
@@ -65,15 +71,97 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose }) => {
   };
 
   const handleAddComment = () => {
-    if (newComment.trim()) {
+    if (!newComment.trim()) return;
+
+    setSendingComment(true);
+
+    if (commentType === 'email') {
+      handleSendEmailFromComment();
+    } else {
+      // Commentaire simple
       addComment(ticket.id, newComment).then(() => {
         console.log('✅ Commentaire ajouté avec succès');
-        // Le commentaire est maintenant visible immédiatement grâce à la mise à jour locale
+        setNewComment('');
       }).catch((error) => {
         console.error('Erreur lors de l\'ajout du commentaire:', error);
         alert('Erreur lors de l\'ajout du commentaire');
+      }).finally(() => {
+        setSendingComment(false);
       });
+    }
+  };
+
+  const handleSendEmailFromComment = async () => {
+    if (!newComment.trim()) return;
+
+    try {
+      // Extraire l'email de l'abonné depuis le subscriberId
+      const emailMatch = currentTicket.subscriberId?.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+      const subscriberEmail = emailMatch ? emailMatch[1] : null;
+      
+      if (!subscriberEmail) {
+        // Chercher dans les abonnés Airtable
+        const subscriber = subscribers.find(sub => 
+          currentTicket.subscriberId?.includes(sub.contratAbonne) || 
+          currentTicket.subscriberId?.includes(`${sub.prenom} ${sub.nom}`)
+        );
+        
+        if (!subscriber?.email) {
+          alert('Impossible de trouver l\'email de l\'abonné. Ajoutez l\'email dans Airtable ou utilisez votre client email habituel.');
+          setSendingComment(false);
+          return;
+        }
+      }
+
+      const finalEmail = subscriberEmail || subscribers.find(sub => 
+        currentTicket.subscriberId?.includes(sub.contratAbonne) || 
+        currentTicket.subscriberId?.includes(`${sub.prenom} ${sub.nom}`)
+      )?.email;
+
+      if (!finalEmail) {
+        alert('Email de l\'abonné introuvable');
+        setSendingComment(false);
+        return;
+      }
+
+      const subject = emailSubject || `Réponse à votre ticket #${currentTicket.id} - ${currentTicket.title}`;
+      const emailBody = `Bonjour,
+
+Suite à votre demande concernant le ticket #${currentTicket.id}, voici notre réponse :
+
+${newComment}
+
+Si vous avez d'autres questions, n'hésitez pas à nous recontacter.
+
+Cordialement,
+L'équipe SunLib
+
+---
+Ticket #${currentTicket.id} - ${currentTicket.title}
+Statut: ${currentTicket.status}
+Priorité: ${currentTicket.priority}`;
+
+      // Envoyer l'email via Gmail
+      await gmailService.sendReply(
+        currentTicket.id, // Utiliser l'ID du ticket comme référence
+        finalEmail,
+        subject,
+        emailBody
+      );
+      
+      // Ajouter aussi un commentaire au ticket
+      await addComment(currentTicket.id, `📧 Email envoyé à ${finalEmail} :\n\nSujet: ${subject}\n\n${newComment}`);
+      
       setNewComment('');
+      setEmailSubject('');
+      setCommentType('comment');
+      alert('Email envoyé avec succès !');
+      
+    } catch (error) {
+      console.error('Erreur envoi email:', error);
+      alert('Erreur lors de l\'envoi de l\'email. Vérifiez que vous êtes connecté à Gmail.');
+    } finally {
+      setSendingComment(false);
     }
   };
 
@@ -269,18 +357,32 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose }) => {
               </div>
             )}
 
+            {/* Formulaire d'envoi d'email */}
+
             {/* Commentaires */}
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-3 flex items-center">
                 <MessageCircle className="w-5 h-5 mr-2" />
-                Commentaires ({currentTicket.comments.length})
+                Historique ({currentTicket.comments.length})
               </h3>
               
               <div className="space-y-4">
                 {currentTicket.comments.map((comment) => (
                   <div key={comment.id} className="bg-gray-50 rounded-lg p-4">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-900">{comment.authorName}</span>
+                      <div className="flex items-center space-x-2">
+                        {comment.content.startsWith('📧 Email envoyé') ? (
+                          <Mail className="w-4 h-4 text-blue-500" />
+                        ) : (
+                          <MessageCircle className="w-4 h-4 text-gray-500" />
+                        )}
+                        <span className="text-sm font-medium text-gray-900">{comment.authorName}</span>
+                        {comment.content.startsWith('📧 Email envoyé') && (
+                          <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                            Email envoyé
+                          </span>
+                        )}
+                      </div>
                       <span className="text-xs text-gray-500">
                         {new Date(comment.createdAt).toLocaleDateString('fr-FR')} à {new Date(comment.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                       </span>
@@ -291,20 +393,111 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose }) => {
                 
                 {/* Nouveau commentaire */}
                 <div className="border-t border-gray-200 pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-medium text-gray-900">Ajouter une réponse :</h4>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => setCommentType('comment')}
+                        className={`flex items-center px-3 py-1 rounded-lg transition-colors text-sm ${
+                          commentType === 'comment' 
+                            ? 'bg-gray-200 text-gray-900' 
+                            : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                        }`}
+                      >
+                        <MessageCircle className="w-4 h-4 mr-1" />
+                        Commentaire
+                      </button>
+                      <button
+                        onClick={() => setCommentType('email')}
+                        className={`flex items-center px-3 py-1 rounded-lg transition-colors text-sm ${
+                          commentType === 'email' 
+                            ? 'bg-blue-200 text-blue-900' 
+                            : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
+                        }`}
+                      >
+                        <Send className="w-4 h-4 mr-1" />
+                        Email à l'abonné
+                      </button>
+                    </div>
+                  </div>
+
+                  {commentType === 'email' && (
+                    <div className="mb-3">
+                      <div className="bg-blue-50 rounded-lg p-3 mb-3">
+                        <p className="text-sm text-blue-800">
+                          📧 Email sera envoyé depuis <strong>abonne@sunlib.fr</strong> vers l'abonné concerné par ce ticket.
+                        </p>
+                      </div>
+                      <input
+                        type="text"
+                        value={emailSubject}
+                        onChange={(e) => setEmailSubject(e.target.value)}
+                        placeholder={`Réponse à votre ticket #${currentTicket.id} - ${currentTicket.title}`}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-2"
+                      />
+                      <label className="text-xs text-gray-500">Sujet de l'email (optionnel)</label>
+                    </div>
+                  )}
+
                   <textarea
                     value={newComment}
                     onChange={(e) => setNewComment(e.target.value)}
-                    placeholder="Ajouter un commentaire..."
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    placeholder={
+                      commentType === 'email' 
+                        ? "Tapez votre message à l'abonné..." 
+                        : "Ajouter un commentaire interne..."
+                    }
+                    rows={4}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:border-orange-500 ${
+                      commentType === 'email' 
+                        ? 'border-blue-300 focus:ring-blue-500 focus:border-blue-500' 
+                        : 'border-gray-300 focus:ring-orange-500'
+                    }`}
                   />
-                  <div className="flex justify-end mt-2">
+                  
+                  <div className="flex justify-between items-center mt-3">
+                    <div className="text-xs text-gray-500">
+                      {commentType === 'email' ? (
+                        <span className="flex items-center">
+                          <Send className="w-3 h-3 mr-1" />
+                          Sera envoyé par email ET ajouté aux commentaires
+                        </span>
+                      ) : (
+                        <span className="flex items-center">
+                          <MessageCircle className="w-3 h-3 mr-1" />
+                          Commentaire interne uniquement
+                        </span>
+                      )}
+                    </div>
                     <button
                       onClick={handleAddComment}
-                      disabled={!newComment.trim()}
-                      className="px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-300 text-white rounded-lg transition-colors"
+                      disabled={!newComment.trim() || sendingComment}
+                      className={`px-4 py-2 rounded-lg transition-colors text-white ${
+                        commentType === 'email'
+                          ? 'bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300'
+                          : 'bg-orange-600 hover:bg-orange-700 disabled:bg-gray-300'
+                      }`}
                     >
-                      Ajouter
+                      {sendingComment ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2 inline-block"></div>
+                          {commentType === 'email' ? 'Envoi...' : 'Ajout...'}
+                        </>
+                      ) : (
+                        <>
+                          {commentType === 'email' ? (
+                            <>
+                              <Send className="w-4 h-4 mr-2 inline-block" />
+                              Envoyer l'email
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="w-4 h-4 mr-2 inline-block" />
+                              Ajouter
+                            </>
+                          )}
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
