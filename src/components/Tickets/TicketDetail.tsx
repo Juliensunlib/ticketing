@@ -12,7 +12,7 @@ interface TicketDetailProps {
 }
 
 const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose }) => {
-  const { updateTicket, addComment } = useTickets();
+  const { tickets, updateTicket, addComment } = useTickets();
   const { user } = useAuth();
   const { users } = useSupabaseUsers();
   const { subscribers } = useAirtable();
@@ -23,6 +23,9 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose }) => {
     priority: ticket.priority,
     assignedTo: ticket.assignedTo || ''
   });
+
+  // Utiliser le ticket mis à jour depuis l'état global au lieu de la prop
+  const currentTicket = tickets.find(t => t.id === ticket.id) || ticket;
 
   const handleStatusUpdate = async () => {
     try {
@@ -64,7 +67,8 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose }) => {
   const handleAddComment = () => {
     if (newComment.trim()) {
       addComment(ticket.id, newComment).then(() => {
-        // Le commentaire sera visible immédiatement grâce au rechargement des données
+        // Le commentaire sera visible immédiatement grâce à la mise à jour locale
+        console.log('✅ Commentaire ajouté avec succès');
       }).catch((error) => {
         console.error('Erreur lors de l\'ajout du commentaire:', error);
         alert('Erreur lors de l\'ajout du commentaire');
@@ -106,12 +110,12 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose }) => {
     }
   };
 
-  const TypeIcon = getTypeIcon(ticket.type);
+  const TypeIcon = getTypeIcon(currentTicket.type);
 
   // Trouver l'abonné correspondant dans Airtable
   const subscriber = subscribers.find(sub => 
-    ticket.subscriberId.includes(sub.contratAbonne) || 
-    ticket.subscriberId.includes(`${sub.prenom} ${sub.nom}`)
+    currentTicket.subscriberId.includes(sub.contratAbonne) || 
+    currentTicket.subscriberId.includes(`${sub.prenom} ${sub.nom}`)
   );
 
   return (
@@ -126,24 +130,24 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose }) => {
                 <div className="flex items-center space-x-3 mb-2">
                   <TypeIcon className="w-5 h-5 text-orange-500" />
                   <h1 className="text-xl font-semibold text-gray-900">
-                    {ticket.subscriberId} - Ticket #{ticket.id}
+                    {currentTicket.subscriberId} - Ticket #{currentTicket.id}
                   </h1>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getPriorityColor(ticket.priority)}`}>
-                    {ticket.priority}
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getPriorityColor(currentTicket.priority)}`}>
+                    {currentTicket.priority}
                   </span>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(ticket.status)}`}>
-                    {ticket.status}
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(currentTicket.status)}`}>
+                    {currentTicket.status}
                   </span>
                 </div>
-                <h2 className="text-lg font-medium text-gray-900 mb-2">{ticket.title}</h2>
+                <h2 className="text-lg font-medium text-gray-900 mb-2">{currentTicket.title}</h2>
                 <div className="flex items-center space-x-4 text-sm text-gray-600">
                   <div className="flex items-center">
                     <Calendar className="w-4 h-4 mr-1" />
-                    Créé le {new Date(ticket.createdAt).toLocaleDateString('fr-FR')}
+                    Créé le {new Date(currentTicket.createdAt).toLocaleDateString('fr-FR')}
                   </div>
                   <div className="flex items-center">
                     <Clock className="w-4 h-4 mr-1" />
-                    Mis à jour le {new Date(ticket.updatedAt).toLocaleDateString('fr-FR')}
+                    Mis à jour le {new Date(currentTicket.updatedAt).toLocaleDateString('fr-FR')}
                   </div>
                 </div>
               </div>
@@ -170,7 +174,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose }) => {
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-3">Description</h3>
               <div className="bg-gray-50 rounded-lg p-4">
-                <p className="text-gray-700 whitespace-pre-wrap">{ticket.description}</p>
+                <p className="text-gray-700 whitespace-pre-wrap">{currentTicket.description}</p>
               </div>
             </div>
 
@@ -181,20 +185,20 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose }) => {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between py-2 border-b border-gray-100">
                     <span className="text-sm text-gray-600">Type</span>
-                    <span className="text-sm font-medium text-gray-900 capitalize">{ticket.type}</span>
+                    <span className="text-sm font-medium text-gray-900 capitalize">{currentTicket.type}</span>
                   </div>
                   <div className="flex items-center justify-between py-2 border-b border-gray-100">
                     <span className="text-sm text-gray-600">Origine</span>
-                    <span className="text-sm font-medium text-gray-900">{ticket.origin}</span>
+                    <span className="text-sm font-medium text-gray-900">{currentTicket.origin}</span>
                   </div>
                   <div className="flex items-center justify-between py-2 border-b border-gray-100">
                     <span className="text-sm text-gray-600">Canal</span>
-                    <span className="text-sm font-medium text-gray-900">{ticket.channel}</span>
+                    <span className="text-sm font-medium text-gray-900">{currentTicket.channel}</span>
                   </div>
                   <div className="flex items-center justify-between py-2">
                     <span className="text-sm text-gray-600">Créé par</span>
                     <span className="text-sm font-medium text-gray-900">
-                      {ticket.createdBy || 'Utilisateur inconnu'}
+                      {currentTicket.createdBy || 'Utilisateur inconnu'}
                     </span>
                   </div>
                 </div>
@@ -206,8 +210,8 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose }) => {
                   <div className="flex items-center justify-between py-2 border-b border-gray-100">
                     <span className="text-sm text-gray-600">Assigné à</span>
                     <span className="text-sm font-medium text-gray-900">
-                      {ticket.assignedTo 
-                        ? users.find(u => u.id === ticket.assignedTo)?.name || 'Utilisateur inconnu'
+                      {currentTicket.assignedTo 
+                        ? users.find(u => u.id === currentTicket.assignedTo)?.name || 'Utilisateur inconnu'
                         : 'Non assigné'
                       }
                     </span>
@@ -215,7 +219,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose }) => {
                   <div className="flex items-center justify-between py-2 border-b border-gray-100">
                     <span className="text-sm text-gray-600">Abonné</span>
                     <span className="text-sm font-medium text-gray-900">
-                      {ticket.subscriberId}
+                      {currentTicket.subscriberId}
                     </span>
                   </div>
                   {subscriber && subscriber.lienCRM && (
@@ -232,10 +236,10 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose }) => {
                       </a>
                     </div>
                   )}
-                  {ticket.installerId && (
+                  {currentTicket.installerId && (
                     <div className="flex items-center justify-between py-2">
                       <span className="text-sm text-gray-600">Installateur</span>
-                      <span className="text-sm font-medium text-gray-900">{ticket.installerId}</span>
+                      <span className="text-sm font-medium text-gray-900">{currentTicket.installerId}</span>
                     </div>
                   )}
                 </div>
@@ -243,14 +247,14 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose }) => {
             </div>
 
             {/* Pièces jointes */}
-            {ticket.attachments.length > 0 && (
+            {currentTicket.attachments.length > 0 && (
               <div>
                 <h3 className="text-lg font-medium text-gray-900 mb-3 flex items-center">
                   <Paperclip className="w-5 h-5 mr-2" />
-                  Pièces jointes ({ticket.attachments.length})
+                  Pièces jointes ({currentTicket.attachments.length})
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {ticket.attachments.map((attachment) => (
+                  {currentTicket.attachments.map((attachment) => (
                     <div key={attachment.id} className="flex items-center p-3 bg-gray-50 rounded-lg">
                       <Paperclip className="w-4 h-4 text-gray-400 mr-3" />
                       <div className="flex-1">
@@ -269,11 +273,11 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose }) => {
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-3 flex items-center">
                 <MessageCircle className="w-5 h-5 mr-2" />
-                Commentaires ({ticket.comments.length})
+                Commentaires ({currentTicket.comments.length})
               </h3>
               
               <div className="space-y-4">
-                {ticket.comments.map((comment) => (
+                {currentTicket.comments.map((comment) => (
                   <div key={comment.id} className="bg-gray-50 rounded-lg p-4">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-gray-900">{comment.authorName}</span>
