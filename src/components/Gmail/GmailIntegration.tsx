@@ -155,6 +155,24 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
     }
   };
 
+  const handleDeleteEmail = (emailId: string, emailSubject: string) => {
+    if (confirm(`Êtes-vous sûr de vouloir supprimer définitivement l'email :\n"${emailSubject}" ?\n\nCette action est irréversible.`)) {
+      // Marquer l'email comme supprimé (même système que les emails traités)
+      const newProcessedEmails = new Set(processedEmails);
+      newProcessedEmails.add(emailId);
+      setProcessedEmails(newProcessedEmails);
+      saveProcessedEmails(newProcessedEmails);
+      
+      // Optionnel : Retirer aussi de la liste locale pour effet immédiat
+      setEmails(prev => prev.filter(email => email.id !== emailId));
+      
+      // Si c'était l'email sélectionné, le désélectionner
+      if (selectedEmail?.id === emailId) {
+        setSelectedEmail(null);
+      }
+    }
+  };
+
   const handleSendReply = async () => {
     if (!selectedEmail || !replyContent.trim()) return;
 
@@ -351,9 +369,9 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
                 localStorage.removeItem('processed_emails');
               }}
               className="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors text-sm"
-              title="Réafficher tous les emails"
+              title="Réafficher tous les emails (y compris ceux traités/supprimés)"
             >
-              Réinitialiser
+              Tout réafficher
             </button>
             <button
               onClick={handleLogout}
@@ -436,16 +454,29 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
                     <span className="text-xs text-gray-500">
                       {formatDate(email.date)}
                     </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCreateTicket(email);
-                      }}
-                      className="text-xs px-2 py-1 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded transition-colors flex items-center"
-                    >
-                      <Plus className="w-3 h-3 mr-1" />
-                      Créer ticket
-                    </button>
+                    <div className="flex items-center space-x-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCreateTicket(email);
+                        }}
+                        className="text-xs px-2 py-1 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded transition-colors flex items-center"
+                        title="Créer un ticket depuis cet email"
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        Créer ticket
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteEmail(email.id, email.subject);
+                        }}
+                        className="text-xs px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded transition-colors flex items-center"
+                        title="Supprimer cet email de la liste"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))
@@ -539,6 +570,14 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Créer un ticket
+                </button>
+                <button
+                  onClick={() => handleDeleteEmail(selectedEmail.id, selectedEmail.subject)}
+                  className="px-4 py-2 border border-red-300 hover:bg-red-50 text-red-700 rounded-lg transition-colors flex items-center"
+                  title="Supprimer cet email"
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Supprimer
                 </button>
                 <button
                   onClick={() => setShowReplyForm(!showReplyForm)}
