@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Filter, Eye, Edit, MessageCircle, Paperclip } from 'lucide-react';
 import { useTickets } from '../../hooks/useTickets';
+import { useSupabaseUsers } from '../../hooks/useSupabaseUsers';
 import { Ticket } from '../../types';
 
 interface TicketListProps {
@@ -10,11 +11,12 @@ interface TicketListProps {
 
 const TicketList: React.FC<TicketListProps> = ({ onViewTicket, onEditTicket }) => {
   const { tickets, loading } = useTickets();
+  const { users } = useSupabaseUsers();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [originFilter, setOriginFilter] = useState('');
-
+  const [assignedFilter, setAssignedFilter] = useState('');
   const filteredTickets = tickets.filter(ticket => {
     const matchesSearch = ticket.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          ticket.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -22,8 +24,9 @@ const TicketList: React.FC<TicketListProps> = ({ onViewTicket, onEditTicket }) =
     const matchesStatus = !statusFilter || ticket.status === statusFilter;
     const matchesPriority = !priorityFilter || ticket.priority === priorityFilter;
     const matchesOrigin = !originFilter || ticket.origin === originFilter;
+    const matchesAssigned = !assignedFilter || ticket.assignedTo === assignedFilter;
 
-    return matchesSearch && matchesStatus && matchesPriority && matchesOrigin;
+    return matchesSearch && matchesStatus && matchesPriority && matchesOrigin && matchesAssigned;
   });
 
   const getPriorityColor = (priority: string) => {
@@ -68,7 +71,7 @@ const TicketList: React.FC<TicketListProps> = ({ onViewTicket, onEditTicket }) =
 
       {/* Filtres et recherche */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
           <div className="lg:col-span-2">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -88,10 +91,12 @@ const TicketList: React.FC<TicketListProps> = ({ onViewTicket, onEditTicket }) =
             className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
           >
             <option value="">Tous les statuts</option>
-            <option value="Ouvert">Ouvert</option>
-            <option value="En cours">En cours</option>
-            <option value="Résolu">Résolu</option>
+            <option value="Nouveau">Nouveau</option>
+            <option value="En attente du client">En attente du client</option>
+            <option value="En attente de l'installateur">En attente de l'installateur</option>
+            <option value="En attente retour service technique">En attente retour service technique</option>
             <option value="Fermé">Fermé</option>
+            <option value="Ouvert">Ouvert</option>
           </select>
 
           <select
@@ -114,6 +119,20 @@ const TicketList: React.FC<TicketListProps> = ({ onViewTicket, onEditTicket }) =
             <option value="Installateur">Installateur</option>
             <option value="SunLib">SunLib</option>
             <option value="Abonné">Abonné</option>
+          </select>
+
+          <select
+            value={assignedFilter}
+            onChange={(e) => setAssignedFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+          >
+            <option value="">Tous les assignés</option>
+            <option value="">Non assigné</option>
+            {users.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.name}
+              </option>
+            ))}
           </select>
         </div>
       </div>
@@ -155,6 +174,13 @@ const TicketList: React.FC<TicketListProps> = ({ onViewTicket, onEditTicket }) =
                   
                   <div className="flex items-center space-x-6 text-xs text-gray-500">
                     <span>Créé le {new Date(ticket.createdAt).toLocaleDateString('fr-FR')}</span>
+                    <span>•</span>
+                    <span>Par: {ticket.createdBy}</span>
+                    <span>•</span>
+                    <span>Assigné à: {ticket.assignedTo 
+                      ? users.find(u => u.id === ticket.assignedTo)?.name || 'Utilisateur inconnu'
+                      : 'Non assigné'
+                    }</span>
                     <span>•</span>
                     <span>Origine: {ticket.origin}</span>
                     <span>•</span>
