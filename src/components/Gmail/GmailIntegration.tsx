@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Plus, Search, RefreshCw, Calendar, User, Paperclip, ExternalLink } from 'lucide-react';
+import { Mail, Plus, Search, RefreshCw, Calendar, User, Paperclip, ExternalLink, LogIn, LogOut } from 'lucide-react';
+import gmailService from '../../services/gmailService';
 
 interface Email {
   id: string;
@@ -19,59 +20,89 @@ interface GmailIntegrationProps {
 const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromEmail }) => {
   const [emails, setEmails] = useState<Email[]>([]);
   const [loading, setLoading] = useState(false);
+  const [authenticating, setAuthenticating] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isConfigured, setIsConfigured] = useState(false);
-
-  // Emails de démonstration
-  const demoEmails: Email[] = [
-    {
-      id: '1',
-      subject: 'Problème avec mon installation solaire',
-      from: 'jean.dupont@email.com',
-      date: '2025-01-26T10:30:00Z',
-      snippet: 'Bonjour, j\'ai un problème avec mon installation solaire depuis hier. Les panneaux ne semblent plus produire...',
-      body: 'Bonjour,\n\nJ\'ai un problème avec mon installation solaire depuis hier. Les panneaux ne semblent plus produire d\'électricité et l\'onduleur affiche un voyant rouge.\n\nPouvez-vous m\'aider ?\n\nCordialement,\nJean Dupont\nContrat: SL-000123',
-      hasAttachments: true,
-      isRead: false
-    },
-    {
-      id: '2',
-      subject: 'Demande de modification de prélèvement',
-      from: 'marie.martin@email.com',
-      date: '2025-01-26T09:15:00Z',
-      snippet: 'Bonjour, je souhaiterais modifier la date de prélèvement de mon contrat...',
-      body: 'Bonjour,\n\nJe souhaiterais modifier la date de prélèvement de mon contrat du 5 au 15 de chaque mois.\n\nPouvez-vous faire le nécessaire ?\n\nCordialement,\nMarie Martin\nContrat: SL-000456',
-      hasAttachments: false,
-      isRead: true
-    },
-    {
-      id: '3',
-      subject: 'Question sur ma facture',
-      from: 'pierre.bernard@email.com',
-      date: '2025-01-25T16:45:00Z',
-      snippet: 'Bonjour, j\'ai une question concernant ma dernière facture...',
-      body: 'Bonjour,\n\nJ\'ai une question concernant ma dernière facture. Le montant me semble élevé par rapport aux mois précédents.\n\nPouvez-vous vérifier ?\n\nCordialement,\nPierre Bernard\nContrat: SL-000789',
-      hasAttachments: true,
-      isRead: false
-    }
-  ];
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Simuler le chargement des emails
-    setLoading(true);
-    setTimeout(() => {
-      setEmails(demoEmails);
-      setLoading(false);
-    }, 1000);
+    // Vérifier si on a un token stocké
+    if (gmailService.loadStoredToken()) {
+      setIsAuthenticated(true);
+      loadEmails();
+    }
+
+    // Gérer le retour de l'authentification OAuth
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    if (code) {
+      handleOAuthCallback(code);
+    }
   }, []);
 
-  const handleRefresh = () => {
+  const handleOAuthCallback = async (code: string) => {
+    setAuthenticating(true);
+    setError(null);
+    
+    try {
+      await gmailService.exchangeCodeForToken(code);
+      setIsAuthenticated(true);
+      
+      // Nettoyer l'URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
+      // Charger les emails
+      await loadEmails();
+    } catch (error) {
+      console.error('Erreur lors de l\'authentification:', error);
+      setError('Erreur lors de la connexion à Gmail. Veuillez réessayer.');
+    } finally {
+      setAuthenticating(false);
+    }
+  };
+
+  const handleGmailLogin = () => {
+    if (!gmailService.isConfigured()) {
+      setError('Configuration Gmail manquante. Vérifiez vos variables d\'environnement.');
+      return;
+    }
+    
+    const authUrl = gmailService.getAuthUrl();
+    window.location.href = authUrl;
+  };
+
+  const handleGmailLogout = () => {
+    gmailService.logout();
+    setIsAuthenticated(false);
+    setEmails([]);
+    setSelectedEmail(null);
+    setError(null);
+  };
+
+  const loadEmails = async () => {
     setLoading(true);
-    setTimeout(() => {
-      setEmails(demoEmails);
+    setError(null);
+    
+    try {
+      const gmailMessages = await gmailService.getMessages(50);
+      setEmails(gmailMessages);
+    } catch (error) {
+      console.error('Erreur lors du chargement des emails:', error);
+      setError(error instanceof Error ? error.message : 'Erreur lors du chargement des emails');
+      
+      if (error instanceof Error && error.message.includes('Token expiré')) {
+        setIsAuthenticated(false);
+      }
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
+  };
+
+  const handleRefresh = async () => {
+    if (isAuthenticated) {
+      await loadEmails();
+    }
   };
 
   const handleCreateTicket = (email: Email) => {
@@ -104,40 +135,66 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Emails Abonnés</h1>
-        <p className="text-gray-600">Gérez vos emails et créez des tickets directement</p>
+        <p className="text-gray-600">
+          {isAuthenticated 
+            ? 'Gérez vos emails Gmail et créez des tickets directement'
+            : 'Connectez-vous à Gmail pour voir vos emails'
+          }
+        </p>
       </div>
 
-      {/* Configuration Gmail */}
-      {!isConfigured && (
+      {/* Messages d'erreur */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+          <div className="flex items-center">
+            <Mail className="w-5 h-5 text-red-600 mr-2" />
+            <p className="text-red-800">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {/* État d'authentification */}
+      {!isAuthenticated && !authenticating && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
           <div className="flex items-center mb-4">
             <Mail className="w-6 h-6 text-blue-600 mr-3" />
-            <h2 className="text-lg font-semibold text-blue-900">Configuration Emails Abonnés</h2>
+            <h2 className="text-lg font-semibold text-blue-900">Connexion Gmail</h2>
           </div>
           <p className="text-blue-800 mb-4">
-            Pour utiliser cette fonctionnalité, vous devez configurer l'intégration avec l'API Gmail de Google.
+            Connectez-vous à votre compte Gmail pour voir vos emails et créer des tickets.
           </p>
-          <div className="space-y-2 text-sm text-blue-700">
-            <p>• Créer un projet dans Google Cloud Console</p>
-            <p>• Activer l'API Gmail</p>
-            <p>• Configurer OAuth 2.0</p>
-            <p>• Ajouter les identifiants dans les variables d'environnement</p>
-          </div>
           <button
-            onClick={() => setIsConfigured(true)}
-            className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+            onClick={handleGmailLogin}
+            disabled={!gmailService.isConfigured()}
+            className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
           >
-            Utiliser la démo
+            <LogIn className="w-4 h-4 mr-2" />
+            Se connecter à Gmail
           </button>
+          {!gmailService.isConfigured() && (
+            <p className="text-xs text-blue-600 mt-2">
+              Configuration Gmail manquante. Vérifiez vos variables d'environnement.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* État d'authentification en cours */}
+      {authenticating && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
+          <div className="flex items-center">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-yellow-600 mr-3"></div>
+            <p className="text-yellow-800">Connexion à Gmail en cours...</p>
+          </div>
         </div>
       )}
 
       {/* Interface principale */}
-      {isConfigured && (
+      {isAuthenticated && (
         <>
           {/* Barre d'outils */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-4">
                 <div className="relative flex-1 min-w-64">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -150,14 +207,26 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
                   />
                 </div>
               </div>
-              <button
-                onClick={handleRefresh}
-                disabled={loading}
-                className="flex items-center px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
-              >
-                <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                Actualiser
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={handleRefresh}
+                  disabled={loading}
+                  className="flex items-center px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                  Actualiser
+                </button>
+                <button
+                  onClick={handleGmailLogout}
+                  className="flex items-center px-3 py-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Se déconnecter de Gmail"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <div className="text-sm text-gray-600">
+              Connecté à Gmail • {emails.length} email{emails.length !== 1 ? 's' : ''}
             </div>
           </div>
 
@@ -166,7 +235,7 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
             <div className="bg-white rounded-xl shadow-sm border border-gray-200">
               <div className="p-4 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-900">
-                  Emails ({filteredEmails.length})
+                  Boîte de réception ({filteredEmails.length})
                 </h2>
               </div>
               
@@ -179,7 +248,9 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
                 ) : filteredEmails.length === 0 ? (
                   <div className="p-8 text-center">
                     <Mail className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-600">Aucun email trouvé</p>
+                    <p className="text-gray-600">
+                      {searchTerm ? 'Aucun email trouvé pour cette recherche' : 'Aucun email dans votre boîte de réception'}
+                    </p>
                   </div>
                 ) : (
                   filteredEmails.map((email) => (
