@@ -36,12 +36,12 @@ export interface Attachment {
 
 export interface Subscriber {
   id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  sellsyId?: string;
-  address?: string;
+  nom: string;
+  prenom: string;
+  contratAbonne: string;
+  nomEntreprise?: string;
   installateur?: string;
+  lienCRM?: string;
 }
 
 export interface AirtableConfig {

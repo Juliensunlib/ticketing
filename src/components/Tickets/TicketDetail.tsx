@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { X, Edit, MessageCircle, Paperclip, Clock, User, Building, Phone, Mail, Calendar, Tag, AlertCircle } from 'lucide-react';
+import { X, Edit, MessageCircle, Paperclip, Clock, User, Building, Phone, Mail, Calendar, Tag, AlertCircle, ExternalLink } from 'lucide-react';
 import { Ticket } from '../../types';
 import { useTickets } from '../../hooks/useTickets';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSupabaseUsers } from '../../hooks/useSupabaseUsers';
+import { useAirtable } from '../../hooks/useAirtable';
 
 interface TicketDetailProps {
   ticket: Ticket;
@@ -14,6 +15,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose }) => {
   const { updateTicket, addComment } = useTickets();
   const { user } = useAuth();
   const { users } = useSupabaseUsers();
+  const { subscribers } = useAirtable();
   const [newComment, setNewComment] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({
@@ -100,6 +102,12 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose }) => {
   };
 
   const TypeIcon = getTypeIcon(ticket.type);
+
+  // Trouver l'abonné correspondant dans Airtable
+  const subscriber = subscribers.find(sub => 
+    ticket.subscriberId.includes(sub.contratAbonne) || 
+    ticket.subscriberId.includes(`${sub.prenom} ${sub.nom}`)
+  );
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -205,6 +213,20 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose }) => {
                       {ticket.subscriberId}
                     </span>
                   </div>
+                  {subscriber && subscriber.lienCRM && (
+                    <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                      <span className="text-sm text-gray-600">Fiche CRM</span>
+                      <a
+                        href={subscriber.lienCRM}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center text-sm font-medium text-orange-600 hover:text-orange-700 transition-colors"
+                      >
+                        Voir la fiche
+                        <ExternalLink className="w-3 h-3 ml-1" />
+                      </a>
+                    </div>
+                  )}
                   {ticket.installerId && (
                     <div className="flex items-center justify-between py-2">
                       <span className="text-sm text-gray-600">Installateur</span>

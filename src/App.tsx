@@ -63,28 +63,6 @@ const AppContent: React.FC = () => {
         return <TicketList onViewTicket={handleViewTicket} onEditTicket={handleEditTicket} />;
       case 'settings':
         return <Settings />;
-      case 'subscribers':
-        return (
-          <div className="p-6">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Abonnés</h1>
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Liste des abonnés</h2>
-                <p className="text-sm text-gray-600 mt-1">
-                  Données synchronisées depuis Airtable
-                </p>
-              </div>
-              <div className="p-6">
-                <div className="space-y-4">
-                  {/* Placeholder pour la liste des abonnés */}
-                  <p className="text-gray-600 text-center py-8">
-                    Fonctionnalité en cours de développement
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
       case 'analytics':
         return (
           <div className="p-6">

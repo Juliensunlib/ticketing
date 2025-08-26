@@ -66,6 +66,8 @@ class AirtableService {
         prenom: record.fields.Prenom || '',
         contratAbonne: record.fields['Contrat abonné'] || '',
         nomEntreprise: record.fields['Nom de l\'entreprise'] || '',
+        installateur: record.fields.Installateur || '',
+        lienCRM: record.fields['Lien CRM'] || '',
       }));
     } catch (error) {
       throw error;

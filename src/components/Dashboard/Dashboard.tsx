@@ -73,44 +73,6 @@ const Dashboard: React.FC = () => {
         />
       </div>
 
-      {/* Tickets récents */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Tickets Récents</h2>
-        </div>
-        <div className="divide-y divide-gray-200">
-          {recentTickets.map((ticket) => (
-            <div key={ticket.id} className="p-6 hover:bg-gray-50 transition-colors">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <h3 className="text-sm font-medium text-gray-900 mb-1">
-                    {ticket.subscriberId} - {ticket.title}
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-2 line-clamp-2">
-                    {ticket.description}
-                  </p>
-                  <div className="flex items-center space-x-4 text-xs text-gray-500">
-                    <span>Créé le {new Date(ticket.createdAt).toLocaleDateString('fr-FR')}</span>
-                    <span>•</span>
-                    <span>Origine: {ticket.origin}</span>
-                    <span>•</span>
-                    <span>Canal: {ticket.channel}</span>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2 ml-4">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(ticket.priority)}`}>
-                    {ticket.priority}
-                  </span>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(ticket.status)}`}>
-                    {ticket.status}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Graphique de répartition par priorité */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
