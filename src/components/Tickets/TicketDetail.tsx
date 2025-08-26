@@ -67,8 +67,8 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose }) => {
   const handleAddComment = () => {
     if (newComment.trim()) {
       addComment(ticket.id, newComment).then(() => {
-        // Le commentaire sera visible immédiatement grâce à la mise à jour locale
         console.log('✅ Commentaire ajouté avec succès');
+        // Le commentaire est maintenant visible immédiatement grâce à la mise à jour locale
       }).catch((error) => {
         console.error('Erreur lors de l\'ajout du commentaire:', error);
         alert('Erreur lors de l\'ajout du commentaire');

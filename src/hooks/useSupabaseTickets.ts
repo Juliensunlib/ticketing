@@ -324,7 +324,6 @@ export const useSupabaseTickets = () => {
       }
 
       console.log('✅ Commentaire ajouté avec succès:', data);
-      // Ne pas recharger toute la liste, juste retourner le commentaire
       return data;
     } catch (err) {
       console.error('❌ Erreur lors de l\'ajout du commentaire:', err);
