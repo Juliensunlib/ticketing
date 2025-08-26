@@ -63,12 +63,19 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
   };
 
   const handleGmailLogin = () => {
+    console.log('🔍 Configuration Gmail:', {
+      clientId: gmailService.isConfigured() ? 'Configuré' : 'Manquant',
+      redirectUri: import.meta.env.VITE_GMAIL_REDIRECT_URI
+    });
+    
     if (!gmailService.isConfigured()) {
       setError('Configuration Gmail manquante. Vérifiez vos variables d\'environnement.');
       return;
     }
     
+    setError(null);
     const authUrl = gmailService.getAuthUrl();
+    console.log('🔗 URL d\'authentification:', authUrl);
     window.location.href = authUrl;
   };
 
@@ -173,8 +180,18 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
           </button>
           {!gmailService.isConfigured() && (
             <p className="text-xs text-blue-600 mt-2">
-              Configuration Gmail manquante. Vérifiez vos variables d'environnement.
+              Configuration Gmail manquante. Vérifiez que votre fichier .env contient les variables VITE_GMAIL_*.
             </p>
+          )}
+          
+          {/* Debug info en développement */}
+          {import.meta.env.DEV && (
+            <div className="mt-4 p-3 bg-gray-100 rounded text-xs">
+              <p><strong>Debug:</strong></p>
+              <p>Client ID: {import.meta.env.VITE_GMAIL_CLIENT_ID ? '✅ Configuré' : '❌ Manquant'}</p>
+              <p>Client Secret: {import.meta.env.VITE_GMAIL_CLIENT_SECRET ? '✅ Configuré' : '❌ Manquant'}</p>
+              <p>Redirect URI: {import.meta.env.VITE_GMAIL_REDIRECT_URI || 'http://localhost:5173/auth/callback'}</p>
+            </div>
           )}
         </div>
       )}

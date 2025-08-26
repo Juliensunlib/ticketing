@@ -42,6 +42,13 @@ class GmailService {
     this.clientSecret = import.meta.env.VITE_GMAIL_CLIENT_SECRET || '';
     this.redirectUri = import.meta.env.VITE_GMAIL_REDIRECT_URI || 'http://localhost:5173/auth/callback';
     this.scope = import.meta.env.VITE_GMAIL_SCOPE || 'https://www.googleapis.com/auth/gmail.readonly';
+    
+    console.log('🔧 Configuration Gmail Service:', {
+      clientId: this.clientId ? `${this.clientId.substring(0, 20)}...` : 'MANQUANT',
+      clientSecret: this.clientSecret ? 'CONFIGURÉ' : 'MANQUANT',
+      redirectUri: this.redirectUri,
+      scope: this.scope
+    });
   }
 
   isConfigured(): boolean {
