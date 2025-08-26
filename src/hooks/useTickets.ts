@@ -122,7 +122,29 @@ export const useTickets = () => {
   };
 
   const addComment = (ticketId: string, content: string) => {
-    return addSupabaseComment(ticketId, content);
+    return addSupabaseComment(ticketId, content).then((newComment) => {
+      // Mettre à jour localement la liste des tickets pour affichage immédiat
+      setTickets(prevTickets => 
+        prevTickets.map(ticket => 
+          ticket.id === ticketId 
+            ? {
+                ...ticket,
+                comments: [
+                  ...ticket.comments,
+                  {
+                    id: newComment.id,
+                    content: newComment.content,
+                    createdAt: newComment.created_at,
+                    createdBy: newComment.created_by,
+                    authorName: newComment.created_by_user?.name || 'Utilisateur inconnu'
+                  }
+                ]
+              }
+            : ticket
+        )
+      );
+      return newComment;
+    });
   };
 
   const addAttachment = (ticketId: string, attachment: Omit<Ticket['attachments'][0], 'id' | 'uploadedAt'>) => {
