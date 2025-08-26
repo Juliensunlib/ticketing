@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Plus, Search, RefreshCw, Calendar, User, Paperclip, ExternalLink } from 'lucide-react';
+import { Mail, Plus, Search, RefreshCw, Calendar, User, Paperclip, ExternalLink, Key, CheckCircle, AlertCircle, Send } from 'lucide-react';
+import gmailService from '../../services/gmailService';
 
 interface Email {
   id: string;
+  threadId?: string;
   subject: string;
   from: string;
   date: string;
@@ -16,215 +18,113 @@ interface GmailIntegrationProps {
   onCreateTicketFromEmail?: (email: Email) => void;
 }
 
-// Emails de démonstration simulant une vraie boîte mail d'abonnés
-const demoEmails: Email[] = [
-  {
-    id: '1',
-    subject: 'Problème avec mon installation solaire - Contrat SL-000123',
-    from: 'jean.dupont@email.com',
-    date: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // Il y a 2h
-    snippet: 'Bonjour, j\'ai un problème avec mon installation solaire. Les panneaux ne produisent plus d\'électricité depuis hier...',
-    body: `Bonjour,
-
-J'ai un problème avec mon installation solaire. Les panneaux ne produisent plus d'électricité depuis hier matin.
-
-Détails de mon contrat :
-- Nom : Jean Dupont
-- Contrat : SL-000123
-- Installation : 12 panneaux solaires
-- Date d'installation : 15/03/2024
-
-Pouvez-vous m'aider rapidement ? C'est urgent car je n'ai plus de production.
-
-Cordialement,
-Jean Dupont
-06 12 34 56 78`,
-    hasAttachments: false,
-    isRead: false
-  },
-  {
-    id: '2',
-    subject: 'Demande de changement de RIB - Marie Martin',
-    from: 'marie.martin@gmail.com',
-    date: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(), // Il y a 5h
-    snippet: 'Bonjour, je souhaite changer mon RIB pour les prélèvements de mon contrat SL-000456...',
-    body: `Bonjour,
-
-Je souhaite changer mon RIB pour les prélèvements de mon contrat solaire.
-
-Informations :
-- Nom : Marie Martin
-- Contrat : SL-000456
-- Nouveau RIB en pièce jointe
-
-Merci de prendre en compte ce changement pour le prochain prélèvement.
-
-Cordialement,
-Marie Martin`,
-    hasAttachments: true,
-    isRead: false
-  },
-  {
-    id: '3',
-    subject: 'Facture impayée - Relance',
-    from: 'pierre.bernard@outlook.fr',
-    date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), // Hier
-    snippet: 'Suite à votre courrier concernant ma facture impayée, je vous informe que...',
-    body: `Madame, Monsieur,
-
-Suite à votre courrier concernant ma facture impayée du mois dernier, je vous informe que j'ai eu des difficultés financières temporaires.
-
-Contrat : SL-000789
-Montant dû : 89,50€
-
-Je peux régler cette facture en 2 fois si possible. Merci de me confirmer.
-
-Cordialement,
-Pierre Bernard`,
-    hasAttachments: false,
-    isRead: true
-  },
-  {
-    id: '4',
-    subject: 'Plainte contre installateur - Installation défectueuse',
-    from: 'sophie.leroy@yahoo.fr',
-    date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // Il y a 2 jours
-    snippet: 'Je souhaite porter plainte contre l\'installateur qui a réalisé mon installation...',
-    body: `Bonjour,
-
-Je souhaite porter plainte contre l'installateur EcoSolar qui a réalisé mon installation solaire.
-
-Problèmes constatés :
-- Installation non conforme aux normes
-- Panneaux mal fixés
-- Onduleur défaillant
-- Installateur injoignable depuis 1 mois
-
-Contrat : SL-000321
-Installateur : EcoSolar SARL
-Date d'installation : 10/01/2024
-
-Photos en pièce jointe.
-
-Cordialement,
-Sophie Leroy`,
-    hasAttachments: true,
-    isRead: false
-  },
-  {
-    id: '5',
-    subject: 'Résiliation anticipée de contrat',
-    from: 'michel.dubois@free.fr',
-    date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), // Il y a 3 jours
-    snippet: 'Je souhaite résilier mon contrat de location de panneaux solaires...',
-    body: `Madame, Monsieur,
-
-Je souhaite résilier mon contrat de location de panneaux solaires pour cause de déménagement.
-
-Informations :
-- Contrat : SL-000654
-- Date de déménagement prévue : 15/02/2025
-- Nouvelle adresse : 123 Rue de la Paix, 69000 Lyon
-
-Merci de me faire parvenir les documents nécessaires.
-
-Cordialement,
-Michel Dubois`,
-    hasAttachments: false,
-    isRead: true
-  },
-  {
-    id: '6',
-    subject: 'Question technique - Monitoring',
-    from: 'claire.moreau@gmail.com',
-    date: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(), // Il y a 4 jours
-    snippet: 'J\'ai des questions sur l\'application de monitoring de ma production solaire...',
-    body: `Bonjour,
-
-J'ai des questions sur l'application de monitoring de ma production solaire.
-
-Questions :
-1. Comment consulter ma production mensuelle ?
-2. Les données sont-elles mises à jour en temps réel ?
-3. Comment signaler un problème via l'app ?
-
-Contrat : SL-000987
-Installation : 8 panneaux + 1 onduleur
-
-Merci pour votre aide.
-
-Cordialement,
-Claire Moreau`,
-    hasAttachments: false,
-    isRead: true
-  },
-  {
-    id: '7',
-    subject: 'Demande d\'ajout de panneaux - Extension',
-    from: 'thomas.petit@hotmail.com',
-    date: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(), // Il y a 6 jours
-    snippet: 'Je souhaite ajouter des panneaux solaires à mon installation existante...',
-    body: `Bonjour,
-
-Je souhaite ajouter des panneaux solaires à mon installation existante.
-
-Installation actuelle :
-- Contrat : SL-000147
-- 6 panneaux installés en mars 2024
-- Production satisfaisante
-
-Demande :
-- Ajout de 4 panneaux supplémentaires
-- Sur le même toit (place disponible)
-- Devis souhaité
-
-Merci de me recontacter.
-
-Cordialement,
-Thomas Petit
-07 89 12 34 56`,
-    hasAttachments: false,
-    isRead: false
-  }
-];
-
 const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromEmail }) => {
-  const [emails, setEmails] = useState<Email[]>(demoEmails);
+  const [emails, setEmails] = useState<Email[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [showReplyForm, setShowReplyForm] = useState(false);
+  const [replyContent, setReplyContent] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
 
-  const handleRefresh = async () => {
-    setLoading(true);
-    // Simuler un rechargement
-    setTimeout(() => {
-      // Ajouter un nouvel email de démonstration
-      const newEmail: Email = {
-        id: Date.now().toString(),
-        subject: 'Nouveau message - Maintenance programmée',
-        from: 'info.maintenance@sunlib.fr',
-        date: new Date().toISOString(),
-        snippet: 'Information importante concernant la maintenance de votre installation...',
-        body: `Cher abonné,
+  // Vérifier l'authentification au chargement
+  useEffect(() => {
+    checkAuthentication();
+    
+    // Écouter les changements d'URL pour capturer le code d'autorisation
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    
+    if (code) {
+      handleAuthCallback(code);
+    }
+  }, []);
 
-Nous vous informons qu'une maintenance préventive de votre installation solaire est programmée.
+  const checkAuthentication = () => {
+    const authenticated = gmailService.isAuthenticated();
+    setIsAuthenticated(authenticated);
+    
+    if (authenticated) {
+      console.log('✅ Utilisateur déjà authentifié, chargement des emails...');
+      loadEmails();
+    } else {
+      console.log('🔑 Authentification requise');
+    }
+  };
 
-Cette maintenance permettra de :
-- Vérifier le bon fonctionnement des panneaux
-- Nettoyer les surfaces
-- Contrôler les connexions
-
-Aucune action de votre part n'est requise.
-
-Cordialement,
-L'équipe SunLib`,
-        hasAttachments: false,
-        isRead: false
-      };
+  const handleAuthCallback = async (code: string) => {
+    try {
+      setLoading(true);
+      setAuthError(null);
       
-      setEmails(prev => [newEmail, ...prev]);
+      console.log('🔄 Traitement du code d\'autorisation...');
+      await gmailService.exchangeCodeForToken(code);
+      
+      setIsAuthenticated(true);
+      
+      // Nettoyer l'URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
+      // Charger les emails
+      await loadEmails();
+      
+    } catch (error) {
+      console.error('❌ Erreur d\'authentification:', error);
+      setAuthError(error instanceof Error ? error.message : 'Erreur d\'authentification');
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
+  };
+
+  const handleGmailAuth = () => {
+    if (!gmailService.isConfigured()) {
+      setAuthError('Configuration Gmail manquante. Vérifiez vos variables d\'environnement.');
+      return;
+    }
+
+    const authUrl = gmailService.getAuthUrl();
+    console.log('🔗 Redirection vers:', authUrl);
+    window.location.href = authUrl;
+  };
+
+  const loadEmails = async () => {
+    if (!isAuthenticated) {
+      console.log('❌ Non authentifié, impossible de charger les emails');
+      return;
+    }
+
+    setLoading(true);
+    setAuthError(null);
+
+    try {
+      console.log('📧 Chargement des emails depuis Gmail...');
+      const gmailEmails = await gmailService.getMessages(50);
+      
+      console.log(`✅ ${gmailEmails.length} emails chargés`);
+      setEmails(gmailEmails);
+      
+    } catch (error) {
+      console.error('❌ Erreur lors du chargement des emails:', error);
+      
+      if (error instanceof Error && error.message === 'NEED_AUTH') {
+        setIsAuthenticated(false);
+        setAuthError('Session expirée. Veuillez vous reconnecter.');
+      } else {
+        setAuthError(`Erreur lors du chargement: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    if (isAuthenticated) {
+      loadEmails();
+    } else {
+      checkAuthentication();
+    }
   };
 
   const handleCreateTicket = (email: Email) => {
@@ -233,6 +133,39 @@ L'équipe SunLib`,
     } else {
       alert(`Création d'un ticket depuis l'email: ${email.subject}`);
     }
+  };
+
+  const handleSendReply = async () => {
+    if (!selectedEmail || !replyContent.trim()) return;
+
+    setSendingReply(true);
+    try {
+      await gmailService.sendReply(
+        selectedEmail.id,
+        selectedEmail.from,
+        selectedEmail.subject,
+        replyContent
+      );
+      
+      setReplyContent('');
+      setShowReplyForm(false);
+      alert('Réponse envoyée avec succès !');
+      
+    } catch (error) {
+      console.error('❌ Erreur envoi réponse:', error);
+      alert('Erreur lors de l\'envoi de la réponse');
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
+  const handleLogout = () => {
+    gmailService.logout();
+    setIsAuthenticated(false);
+    setEmails([]);
+    setSelectedEmail(null);
+    setAuthError(null);
+    console.log('🚪 Déconnexion effectuée');
   };
 
   const markAsRead = (emailId: string) => {
@@ -276,12 +209,88 @@ L'équipe SunLib`,
 
   const unreadCount = emails.filter(email => !email.isRead).length;
 
+  // Interface de connexion
+  if (!isAuthenticated) {
+    return (
+      <div className="p-6 space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Emails Abonnés</h1>
+          <p className="text-gray-600">Connectez-vous à la boîte mail abonne@sunlib.fr</p>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+          <div className="text-center space-y-6">
+            <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto">
+              <Mail className="w-8 h-8 text-orange-600" />
+            </div>
+            
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                Connexion à Gmail
+              </h2>
+              <p className="text-gray-600">
+                Connectez-vous à la boîte mail <strong>abonne@sunlib.fr</strong> pour voir les emails des abonnés
+              </p>
+            </div>
+
+            {authError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <AlertCircle className="w-5 h-5 text-red-500 mr-2" />
+                  <p className="text-red-800 text-sm">{authError}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <button
+                onClick={handleGmailAuth}
+                disabled={loading || !gmailService.isConfigured()}
+                className="w-full flex items-center justify-center px-6 py-3 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
+              >
+                {loading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                    Connexion en cours...
+                  </>
+                ) : (
+                  <>
+                    <Key className="w-5 h-5 mr-2" />
+                    Se connecter à Gmail
+                  </>
+                )}
+              </button>
+
+              {!gmailService.isConfigured() && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <AlertCircle className="w-5 h-5 text-yellow-500 mr-2" />
+                    <p className="text-yellow-800 text-sm">
+                      Configuration Gmail manquante. Vérifiez vos variables d'environnement.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="text-xs text-gray-500 space-y-1">
+              <p>🔒 Connexion sécurisée via OAuth 2.0</p>
+              <p>📧 Accès en lecture et envoi d'emails</p>
+              <p>💾 Session sauvegardée automatiquement</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Interface principale avec emails
   return (
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Emails Abonnés</h1>
         <p className="text-gray-600">
-          Boîte mail des abonnés SunLib - {unreadCount} message{unreadCount !== 1 ? 's' : ''} non lu{unreadCount !== 1 ? 's' : ''}
+          Boîte mail abonne@sunlib.fr - {unreadCount} message{unreadCount !== 1 ? 's' : ''} non lu{unreadCount !== 1 ? 's' : ''}
         </p>
       </div>
 
@@ -289,6 +298,10 @@ L'équipe SunLib`,
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-4">
+            <div className="flex items-center text-green-600">
+              <CheckCircle className="w-5 h-5 mr-2" />
+              <span className="text-sm font-medium">Connecté à Gmail</span>
+            </div>
             <div className="relative flex-1 min-w-64">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
@@ -309,12 +322,27 @@ L'équipe SunLib`,
               <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Actualiser
             </button>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors"
+            >
+              Déconnexion
+            </button>
           </div>
         </div>
         <div className="text-sm text-gray-600">
-          Boîte mail SunLib • {emails.length} email{emails.length !== 1 ? 's' : ''} • {unreadCount} non lu{unreadCount !== 1 ? 's' : ''}
+          abonne@sunlib.fr • {emails.length} email{emails.length !== 1 ? 's' : ''} • {unreadCount} non lu{unreadCount !== 1 ? 's' : ''}
         </div>
       </div>
+
+      {authError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <AlertCircle className="w-5 h-5 text-red-500 mr-2" />
+            <p className="text-red-800 text-sm">{authError}</p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Liste des emails */}
@@ -326,7 +354,12 @@ L'équipe SunLib`,
           </div>
           
           <div className="divide-y divide-gray-200 max-h-96 overflow-y-auto">
-            {filteredEmails.length === 0 ? (
+            {loading && emails.length === 0 ? (
+              <div className="p-8 text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-4"></div>
+                <p className="text-gray-600">Chargement des emails...</p>
+              </div>
+            ) : filteredEmails.length === 0 ? (
               <div className="p-8 text-center">
                 <Mail className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-600">
@@ -416,12 +449,54 @@ L'équipe SunLib`,
               
               <div className="border-t border-gray-200 pt-4">
                 <h4 className="font-medium text-gray-900 mb-2">Contenu:</h4>
-                <div className="bg-gray-50 rounded-lg p-3">
+                <div className="bg-gray-50 rounded-lg p-3 max-h-48 overflow-y-auto">
                   <p className="text-sm text-gray-700 whitespace-pre-wrap">
                     {selectedEmail.body || selectedEmail.snippet}
                   </p>
                 </div>
               </div>
+              
+              {/* Formulaire de réponse */}
+              {showReplyForm && (
+                <div className="border-t border-gray-200 pt-4">
+                  <h4 className="font-medium text-gray-900 mb-2">Répondre:</h4>
+                  <textarea
+                    value={replyContent}
+                    onChange={(e) => setReplyContent(e.target.value)}
+                    placeholder="Tapez votre réponse..."
+                    rows={4}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  />
+                  <div className="flex space-x-2 mt-2">
+                    <button
+                      onClick={handleSendReply}
+                      disabled={sendingReply || !replyContent.trim()}
+                      className="flex items-center px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
+                    >
+                      {sendingReply ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Envoi...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4 mr-2" />
+                          Envoyer
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowReplyForm(false);
+                        setReplyContent('');
+                      }}
+                      className="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors"
+                    >
+                      Annuler
+                    </button>
+                  </div>
+                </div>
+              )}
               
               <div className="flex space-x-3 pt-4 border-t border-gray-200">
                 <button
@@ -430,6 +505,13 @@ L'équipe SunLib`,
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Créer un ticket
+                </button>
+                <button
+                  onClick={() => setShowReplyForm(!showReplyForm)}
+                  className="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors flex items-center"
+                >
+                  <Send className="w-4 h-4 mr-2" />
+                  Répondre
                 </button>
                 <button
                   onClick={() => window.open(`mailto:${selectedEmail.from}`, '_blank')}

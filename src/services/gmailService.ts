@@ -32,23 +32,23 @@ interface GmailListResponse {
 
 class GmailService {
   private accessToken: string | null = null;
+  private refreshToken: string | null = null;
   private clientId: string;
   private clientSecret: string;
   private redirectUri: string;
   private scope: string;
+  private tokenExpiresAt: number = 0;
 
   constructor() {
     this.clientId = import.meta.env.VITE_GMAIL_CLIENT_ID || '';
     this.clientSecret = import.meta.env.VITE_GMAIL_CLIENT_SECRET || '';
-    this.redirectUri = import.meta.env.VITE_GMAIL_REDIRECT_URI || 'http://localhost:5173/auth/callback';
-    this.scope = import.meta.env.VITE_GMAIL_SCOPE || 'https://www.googleapis.com/auth/gmail.readonly';
+    this.redirectUri = import.meta.env.VITE_GMAIL_REDIRECT_URI || 'https://ticketing-jade.vercel.app/auth/callback';
+    this.scope = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send';
     
-    console.log('🔧 Configuration Gmail Service:', {
-      clientId: this.clientId ? `${this.clientId.substring(0, 20)}...` : 'MANQUANT',
-      clientSecret: this.clientSecret ? 'CONFIGURÉ' : 'MANQUANT',
-      redirectUri: this.redirectUri,
-      scope: this.scope
-    });
+    // Charger les tokens sauvegardés au démarrage
+    this.loadStoredTokens();
+    
+    console.log('🔧 Gmail Service initialisé pour abonne@sunlib.fr');
   }
 
   isConfigured(): boolean {
@@ -62,7 +62,8 @@ class GmailService {
       scope: this.scope,
       response_type: 'code',
       access_type: 'offline',
-      prompt: 'consent'
+      prompt: 'consent',
+      login_hint: 'abonne@sunlib.fr' // Suggère le compte à utiliser
     });
 
     return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
@@ -70,6 +71,8 @@ class GmailService {
 
   async exchangeCodeForToken(code: string): Promise<void> {
     try {
+      console.log('🔄 Échange du code d\'autorisation...');
+      
       const response = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: {
@@ -85,53 +88,136 @@ class GmailService {
       });
 
       if (!response.ok) {
-        throw new Error(`Erreur OAuth: ${response.statusText}`);
+        const errorData = await response.json();
+        console.error('❌ Erreur OAuth:', errorData);
+        throw new Error(`Erreur OAuth: ${errorData.error_description || response.statusText}`);
       }
 
       const data = await response.json();
-      this.accessToken = data.access_token;
+      console.log('✅ Tokens reçus avec succès');
       
-      // Sauvegarder le token dans le localStorage
-      localStorage.setItem('gmail_access_token', data.access_token);
-      if (data.refresh_token) {
-        localStorage.setItem('gmail_refresh_token', data.refresh_token);
-      }
+      this.accessToken = data.access_token;
+      this.refreshToken = data.refresh_token;
+      this.tokenExpiresAt = Date.now() + (data.expires_in * 1000);
+      
+      // Sauvegarder les tokens
+      this.saveTokens();
+      
     } catch (error) {
-      console.error('Erreur lors de l\'échange du code:', error);
+      console.error('❌ Erreur lors de l\'échange du code:', error);
       throw error;
     }
   }
 
-  loadStoredToken(): boolean {
-    const token = localStorage.getItem('gmail_access_token');
-    if (token) {
-      this.accessToken = token;
-      return true;
+  private saveTokens(): void {
+    if (this.accessToken) {
+      localStorage.setItem('gmail_access_token', this.accessToken);
+      localStorage.setItem('gmail_token_expires_at', this.tokenExpiresAt.toString());
     }
-    return false;
+    if (this.refreshToken) {
+      localStorage.setItem('gmail_refresh_token', this.refreshToken);
+    }
+    console.log('💾 Tokens sauvegardés');
+  }
+
+  private loadStoredTokens(): void {
+    this.accessToken = localStorage.getItem('gmail_access_token');
+    this.refreshToken = localStorage.getItem('gmail_refresh_token');
+    const expiresAt = localStorage.getItem('gmail_token_expires_at');
+    
+    if (expiresAt) {
+      this.tokenExpiresAt = parseInt(expiresAt);
+    }
+    
+    if (this.accessToken) {
+      console.log('✅ Tokens chargés depuis le stockage local');
+    }
+  }
+
+  private async refreshAccessToken(): Promise<void> {
+    if (!this.refreshToken) {
+      throw new Error('Aucun refresh token disponible');
+    }
+
+    try {
+      console.log('🔄 Actualisation du token d\'accès...');
+      
+      const response = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          client_id: this.clientId,
+          client_secret: this.clientSecret,
+          refresh_token: this.refreshToken,
+          grant_type: 'refresh_token',
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur refresh token: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      this.accessToken = data.access_token;
+      this.tokenExpiresAt = Date.now() + (data.expires_in * 1000);
+      
+      // Sauvegarder le nouveau token
+      this.saveTokens();
+      
+      console.log('✅ Token actualisé avec succès');
+    } catch (error) {
+      console.error('❌ Erreur lors de l\'actualisation du token:', error);
+      // Si le refresh échoue, supprimer tous les tokens
+      this.logout();
+      throw error;
+    }
+  }
+
+  private async ensureValidToken(): Promise<void> {
+    // Si pas de token, lancer l'authentification
+    if (!this.accessToken) {
+      throw new Error('NEED_AUTH');
+    }
+
+    // Si le token expire dans moins de 5 minutes, le rafraîchir
+    if (this.tokenExpiresAt && Date.now() > (this.tokenExpiresAt - 5 * 60 * 1000)) {
+      await this.refreshAccessToken();
+    }
   }
 
   isAuthenticated(): boolean {
-    return !!this.accessToken;
+    return !!(this.accessToken && this.tokenExpiresAt > Date.now());
   }
 
-  async makeGmailRequest(endpoint: string): Promise<any> {
-    if (!this.accessToken) {
-      throw new Error('Non authentifié');
-    }
+  async makeGmailRequest(endpoint: string, method: 'GET' | 'POST' = 'GET', body?: any): Promise<any> {
+    await this.ensureValidToken();
 
-    const response = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/${endpoint}`, {
+    const options: RequestInit = {
+      method,
       headers: {
         'Authorization': `Bearer ${this.accessToken}`,
         'Content-Type': 'application/json',
       },
-    });
+    };
+
+    if (body && method === 'POST') {
+      options.body = JSON.stringify(body);
+    }
+
+    const response = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/${endpoint}`, options);
 
     if (!response.ok) {
       if (response.status === 401) {
-        // Token expiré, supprimer et demander une nouvelle authentification
-        this.logout();
-        throw new Error('Token expiré, veuillez vous reconnecter');
+        // Token invalide, essayer de le rafraîchir
+        try {
+          await this.refreshAccessToken();
+          // Réessayer la requête avec le nouveau token
+          return this.makeGmailRequest(endpoint, method, body);
+        } catch (refreshError) {
+          throw new Error('NEED_AUTH');
+        }
       }
       throw new Error(`Erreur Gmail API: ${response.statusText}`);
     }
@@ -141,31 +227,75 @@ class GmailService {
 
   async getMessages(maxResults: number = 50): Promise<any[]> {
     try {
+      console.log('📧 Récupération des emails...');
+      
       // Récupérer la liste des messages
       const listResponse: GmailListResponse = await this.makeGmailRequest(
         `messages?maxResults=${maxResults}&q=in:inbox`
       );
 
       if (!listResponse.messages || listResponse.messages.length === 0) {
+        console.log('📭 Aucun email trouvé');
         return [];
       }
 
-      // Récupérer les détails de chaque message
+      console.log(`📬 ${listResponse.messages.length} emails trouvés`);
+
+      // Récupérer les détails de chaque message (limité à 20 pour les performances)
       const messages = await Promise.all(
-        listResponse.messages.slice(0, 10).map(async (msg) => {
+        listResponse.messages.slice(0, 20).map(async (msg) => {
           try {
             const messageDetail: GmailMessage = await this.makeGmailRequest(`messages/${msg.id}`);
             return this.parseMessage(messageDetail);
           } catch (error) {
-            console.error(`Erreur lors de la récupération du message ${msg.id}:`, error);
+            console.error(`❌ Erreur message ${msg.id}:`, error);
             return null;
           }
         })
       );
 
-      return messages.filter(msg => msg !== null);
+      const validMessages = messages.filter(msg => msg !== null);
+      console.log(`✅ ${validMessages.length} emails traités avec succès`);
+      
+      return validMessages;
     } catch (error) {
-      console.error('Erreur lors de la récupération des messages:', error);
+      console.error('❌ Erreur lors de la récupération des messages:', error);
+      throw error;
+    }
+  }
+
+  async sendReply(originalMessageId: string, to: string, subject: string, body: string): Promise<void> {
+    try {
+      console.log('📤 Envoi de la réponse email...');
+      
+      // Récupérer le message original pour obtenir le thread ID
+      const originalMessage = await this.makeGmailRequest(`messages/${originalMessageId}`);
+      
+      // Construire l'email de réponse
+      const emailContent = [
+        `To: ${to}`,
+        `Subject: Re: ${subject.replace(/^Re:\s*/i, '')}`,
+        `In-Reply-To: ${originalMessageId}`,
+        `References: ${originalMessageId}`,
+        '',
+        body
+      ].join('\n');
+
+      // Encoder en base64
+      const encodedMessage = btoa(unescape(encodeURIComponent(emailContent)))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+
+      // Envoyer l'email
+      await this.makeGmailRequest('messages/send', 'POST', {
+        raw: encodedMessage,
+        threadId: originalMessage.threadId
+      });
+
+      console.log('✅ Réponse envoyée avec succès');
+    } catch (error) {
+      console.error('❌ Erreur lors de l\'envoi de la réponse:', error);
       throw error;
     }
   }
@@ -191,6 +321,7 @@ class GmailService {
 
     return {
       id: message.id,
+      threadId: message.threadId,
       subject,
       from,
       date: new Date(parseInt(message.internalDate)).toISOString(),
@@ -209,15 +340,24 @@ class GmailService {
       const base64 = data.replace(/-/g, '+').replace(/_/g, '/');
       return decodeURIComponent(escape(atob(base64)));
     } catch (error) {
-      console.error('Erreur lors du décodage base64:', error);
+      console.error('❌ Erreur décodage base64:', error);
       return data;
     }
   }
 
   logout(): void {
+    console.log('🚪 Déconnexion Gmail');
     this.accessToken = null;
+    this.refreshToken = null;
+    this.tokenExpiresAt = 0;
     localStorage.removeItem('gmail_access_token');
     localStorage.removeItem('gmail_refresh_token');
+    localStorage.removeItem('gmail_token_expires_at');
+  }
+
+  // Méthode pour vérifier si on a besoin d'une authentification
+  needsAuthentication(): boolean {
+    return !this.isAuthenticated();
   }
 }
 
