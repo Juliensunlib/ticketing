@@ -103,7 +103,7 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Emails Gmail</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Emails Abonnés</h1>
         <p className="text-gray-600">Gérez vos emails et créez des tickets directement</p>
       </div>
 
@@ -112,10 +112,10 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
           <div className="flex items-center mb-4">
             <Mail className="w-6 h-6 text-blue-600 mr-3" />
-            <h2 className="text-lg font-semibold text-blue-900">Configuration Gmail</h2>
+            <h2 className="text-lg font-semibold text-blue-900">Configuration Emails Abonnés</h2>
           </div>
           <p className="text-blue-800 mb-4">
-            Pour utiliser cette fonctionnalité, vous devez configurer l'intégration Gmail avec l'API Google.
+            Pour utiliser cette fonctionnalité, vous devez configurer l'intégration avec l'API Gmail de Google.
           </p>
           <div className="space-y-2 text-sm text-blue-700">
             <p>• Créer un projet dans Google Cloud Console</p>

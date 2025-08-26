@@ -11,7 +11,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange }) => {
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'create', label: 'Nouveau Ticket', icon: Plus },
     { id: 'tickets', label: 'Tous les Tickets', icon: FileText },
-    { id: 'emails', label: 'Emails Gmail', icon: Mail },
+    { id: 'emails', label: 'Emails Abonnés', icon: Mail },
     { id: 'analytics', label: 'Statistiques', icon: BarChart3 },
     { id: 'settings', label: 'Paramètres', icon: Settings },
   ];
