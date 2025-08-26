@@ -406,8 +406,10 @@ const Settings: React.FC = () => {
                       onChange={(e) => setNewUser(prev => ({ ...prev, user_group: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                     >
-                      <option value="support">Support</option>
-                      <option value="admin">Administrateur</option>
+                      <option value="service_client">Service client</option>
+                      <option value="service_technique">Service technique</option>
+                      <option value="commercial">Commercial</option>
+                      <option value="admin">Admin</option>
                     </select>
                   </div>
                   <button
