@@ -31,7 +31,7 @@ const Settings: React.FC = () => {
   const [newUser, setNewUser] = useState({
     email: '',
     name: '',
-    user_group: 'support'
+    user_group: 'service_client'
   });
 
   const handleSaveNotifications = () => {
