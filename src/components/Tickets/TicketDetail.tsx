@@ -417,7 +417,7 @@ Priorité: ${currentTicket.priority}`;
                       {currentTicket.subscriberId}
                     </span>
                   </div>
-                  {subscriber && subscriber.lienCRM && (
+                  {subscriber?.lienCRM && (
                     <div className="flex items-center justify-between py-2 border-b border-gray-100">
                       <span className="text-sm text-gray-600">Fiche CRM</span>
                       <a
