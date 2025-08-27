@@ -37,8 +37,10 @@ export const useAirtable = () => {
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
+    const config = getAirtableConfig();
     const service = config ? new AirtableService(config.apiKey, config.subscribersBaseId) : null;
     
+    const loadDataWithService = async (service: AirtableService) => {
       console.log('✅ Configuration Airtable trouvée, chargement des données...');
       setLoading(true);
       setError(null);
@@ -81,10 +83,11 @@ export const useAirtable = () => {
     } else {
       console.warn('⚠️ Airtable non configuré - Mode saisie manuelle uniquement');
       setError('Configuration Airtable manquante. Vérifiez les variables d\'environnement VITE_AIRTABLE_API_KEY et VITE_AIRTABLE_SUBSCRIBERS_BASE_ID dans votre fichier .env\n💡 Vérifiez que les variables VITE_AIRTABLE_API_KEY et VITE_AIRTABLE_SUBSCRIBERS_BASE_ID sont configurées dans votre fichier .env');
+      setInitialized(true);
+    }
     // Timeout de sécurité pour éviter le blocage
     const timeout = setTimeout(() => {
-    console.error('❌ Configuration Airtable invalide ou manquante');
-      }
+      console.error('❌ Configuration Airtable invalide ou manquante');
     }, 5000); // 5 secondes maximum
     
     return () => clearTimeout(timeout);
@@ -154,6 +157,8 @@ export const useAirtable = () => {
     }
   };
 
+  console.log('✅ Configuration Airtable valide');
+
   return {
     subscribers,
     loading,
@@ -162,6 +167,5 @@ export const useAirtable = () => {
     loadData,
     createTicket,
     updateTicket,
-  console.log('✅ Configuration Airtable valide');
   };
 };
