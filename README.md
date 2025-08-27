@@ -1,94 +1,170 @@
-# Outil de Ticketing SunLib
+import { useState, useEffect } from 'react';
+import AirtableService from '../services/airtable';
+import { Subscriber } from '../types';
 
-Un outil de ticketing moderne et complet pour gérer les tickets de support provenant de différentes sources (installateurs, abonnés, équipe SunLib).
+// Configuration depuis les variables d'environnement
+const getAirtableConfig = () => {
+  const apiKey = import.meta.env.VITE_AIRTABLE_API_KEY;
+  const subscribersBaseId = import.meta.env.VITE_AIRTABLE_SUBSCRIBERS_BASE_ID;
 
-## 🚀 Fonctionnalités
+  // Logs uniquement en mode développement et si les variables sont définies
+  if (import.meta.env.DEV && (apiKey || subscribersBaseId)) {
+    console.log('🔍 Configuration Airtable:');
+    console.log('- API Key:', apiKey ? `${apiKey.substring(0, 8)}...` : 'MANQUANTE');
+    console.log('- Base ID:', subscribersBaseId || 'MANQUANTE');
+  }
 
-- **Dashboard** avec statistiques en temps réel
-- **Création de tickets** avec formulaire dynamique
-- **Gestion complète** des tickets (statuts, priorités, assignation)
-- **Système de commentaires** et historique
-- **Intégration Airtable** pour la synchronisation des données
-- **Interface responsive** optimisée mobile et desktop
-- **Notifications** configurables
+  if (!apiKey || !subscribersBaseId || 
+      apiKey === 'votre_clé_api_airtable' || 
+      subscribersBaseId === 'id_de_votre_base_abonnés' ||
+      apiKey.trim() === '' || 
+      subscribersBaseId.trim() === '') {
+    // Ne pas afficher d'avertissement si on est en production (variables dans Vercel)
+    if (import.meta.env.DEV) {
+      console.info('ℹ️ Configuration Airtable locale non trouvée. Mode saisie manuelle activé.');
+    }
+    return null;
+  }
 
-## ⚙️ Configuration
+  return { apiKey, subscribersBaseId };
+};
 
-### Variables d'environnement
+export const useAirtable = () => {
+  const [airtableService, setAirtableService] = useState<AirtableService | null>(null);
+  const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [initialized, setInitialized] = useState(false);
 
-Créez un fichier `.env` à la racine du projet avec vos identifiants Airtable :
+  useEffect(() => {
+    const config = getAirtableConfig();
+    if (config) {
+      console.log('✅ Configuration Airtable trouvée, chargement des données...');
+      const service = new AirtableService(config.apiKey, config.subscribersBaseId);
+      setAirtableService(service);
+      // Charger les données en arrière-plan sans bloquer l'interface
+      loadDataWithService(service).catch((error) => {
+        console.error('Erreur lors du chargement initial des données Airtable:', error);
+        // Ne pas bloquer l'interface même en cas d'erreur
+        setError(`Connexion Airtable impossible: ${error.message}`);
+      }).finally(() => {
+        setInitialized(true);
+      });
+    } else {
+      setInitialized(true);
+    }
+    
+    // Timeout de sécurité pour éviter le blocage
+    const timeout = setTimeout(() => {
+      if (!initialized) {
+        console.warn('⚠️ Timeout d\'initialisation Airtable, déblocage forcé');
+        setInitialized(true);
+        setLoading(false);
+      }
+    }, 5000); // 5 secondes maximum
+    
+    return () => clearTimeout(timeout);
+  }, []);
 
-```env
-VITE_AIRTABLE_API_KEY=votre_clé_api_airtable
-VITE_AIRTABLE_SUBSCRIBERS_BASE_ID=id_de_votre_base_abonnés
-VITE_AIRTABLE_HR_BASE_ID=id_de_votre_base_rh
-```
+  const loadDataWithService = async (service: AirtableService) => {
+    console.log('🔄 useAirtable: Chargement des données...');
+    setLoading(true);
+    setError(null);
+    
+    try {
+      let subscribersData: Subscriber[] = [];
 
-### Comment obtenir vos identifiants Airtable
+      try {
+        console.log('🔄 Chargement des abonnés Airtable...');
+        subscribersData = await service.getSubscribers();
+        console.log('✅ Abonnés chargés:', subscribersData.length);
+      } catch (err) {
+        console.error('❌ Erreur Airtable:', err);
+        setError(`Erreur de chargement Airtable: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
+        // Airtable non disponible - continuer avec tableau vide
+      }
 
-1. **Clé API** : 
-   - Connectez-vous à Airtable
-   - Allez dans Account → API
-   - Générez une nouvelle clé API
+      setSubscribers(subscribersData);
+      
+    } catch (err) {
+      console.error('❌ Erreur générale lors du chargement:', err);
+      setError(`Erreur générale: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-2. **ID de base** :
-   - Ouvrez votre base Airtable
-### Structure des bases Airtable requise
+  const loadData = async () => {
+    console.log('🔄 useAirtable: Rechargement manuel des données...');
+    if (!airtableService) {
+      console.warn('⚠️ Service Airtable non initialisé. Vérifiez la configuration dans le fichier .env');
+      setError('Configuration Airtable manquante. Vérifiez les variables d\'environnement VITE_AIRTABLE_API_KEY et VITE_AIRTABLE_SUBSCRIBERS_BASE_ID dans votre fichier .env');
+      return;
+    }
 
-#### Base Abonnés
-- **Table "Abonnés"** : Nom, Prenom, Contrat abonné, Nom de l'entreprise (from Installateur)
-- **Table "Installateurs"** : Name, Company
-- **Table "Tickets"** : pour la synchronisation des tickets créés
+    setLoading(true);
+    setError(null);
 
-### Configuration Supabase
+    try {
+      console.log('Rechargement des données Airtable...');
+      
+      const subscribersData = await airtableService.getSubscribers();
 
-L'application utilise maintenant Supabase pour la gestion des utilisateurs (remplace la base RH Airtable).
+      console.log('Abonnés récupérés:', subscribersData);
 
-1. **Connexion Supabase** : Cliquez sur "Connect to Supabase" en haut à droite
-2. **Base de données** : Une table `users` sera automatiquement créée
-3. **Gestion** : Ajoutez vos utilisateurs via l'interface de paramètres
+      setSubscribers(subscribersData);
+      setError(null); // Réinitialiser l'erreur en cas de succès
+    } catch (err) {
+      console.error('Erreur lors du chargement des données Airtable:', err);
+      if (err instanceof Error && err.message.includes('Failed to fetch')) {
+        setError('Connexion à Airtable impossible. Contactez l\'administrateur si le problème persiste.');
+      } else {
+        setError(`Erreur lors du rechargement: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
-## 🛠️ Installation et démarrage
+  const createTicket = async (ticketData: any) => {
+    console.log('🎫 useAirtable: Création de ticket...');
+    if (!airtableService) {
+      console.warn('Service Airtable non configuré, ticket créé uniquement dans Supabase');
+      return null;
+    }
+    
+    try {
+      return await airtableService.createTicketRecord(ticketData);
+    } catch (error) {
+      console.error('❌ Erreur création ticket Airtable:', error);
+      // Ne pas faire échouer la création si Airtable échoue
+      return null;
+    }
+  };
 
-```bash
-# Installation des dépendances
-npm install
+  const updateTicket = async (recordId: string, ticketData: any) => {
+    console.log('🔄 useAirtable: Mise à jour de ticket...');
+    if (!airtableService) {
+      console.warn('Service Airtable non configuré, mise à jour uniquement dans Supabase');
+      return null;
+    }
+    
+    try {
+      return await airtableService.updateTicketRecord(recordId, ticketData);
+    } catch (error) {
+      console.error('❌ Erreur mise à jour ticket Airtable:', error);
+      // Ne pas faire échouer la mise à jour si Airtable échoue
+      return null;
+    }
+  };
 
-# Démarrage en mode développement
-npm run dev
-
-# Build pour la production
-npm run build
-```
-
-## 📱 Utilisation
-
-1. **Configuration Supabase** : 
-   - Cliquez sur "Connect to Supabase" pour configurer la base de données
-   - Les migrations créeront automatiquement les utilisateurs de test
-2. **Configuration Airtable** : Ajoutez vos clés Airtable dans le fichier `.env`
-3. **Vérification** : Allez dans Paramètres pour vérifier la connexion
-4. **Connexion** : Utilisez les comptes de test ou créez vos propres utilisateurs
-5. **Utilisation** : Créez vos premiers tickets !
-
-### Comptes de test
-
-Après la configuration Supabase, vous pouvez vous connecter avec :
-- **Admin** : admin@sunlib.fr / admin123
-- **Support** : marie.dubois@sunlib.fr / support123
-
-## 🎨 Design
-
-L'interface utilise la palette graphique SunLib avec des tons orange/jaune rappelant l'énergie solaire, optimisée pour une utilisation professionnelle.
-
-## 🔒 Sécurité
-
-- Configuration via variables d'environnement
-- Authentification Supabase sécurisée
-- Row Level Security (RLS) activé
-- Validation des données côté client
-- Gestion d'erreurs robuste
-
-## 📞 Support
-
-Pour toute question ou problème, consultez la section Paramètres de l'application qui contient des guides détaillés pour la configuration.
+  return {
+    subscribers,
+    loading,
+    error,
+    initialized,
+    loadData,
+    createTicket,
+    updateTicket,
+  };
+};
