@@ -47,32 +47,6 @@ export const useAirtable = () => {
   const [error, setError] = useState<string | null>(globalError);
   const [initialized, setInitialized] = useState(globalInitialized);
 
-  // Forcer le re-render quand les données globales changent
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (globalSubscribers !== subscribers || 
-          globalLoading !== loading || 
-          globalError !== error || 
-          globalInitialized !== initialized) {
-        
-        console.log('🔄 useAirtable: Synchronisation forcée détectée');
-        console.log('📊 Nouvelles données:', {
-          subscribers: globalSubscribers.length,
-          loading: globalLoading,
-          error: globalError,
-          initialized: globalInitialized
-        });
-        
-        setSubscribers([...globalSubscribers]);
-        setLoading(globalLoading);
-        setError(globalError);
-        setInitialized(globalInitialized);
-      }
-    }, 1000); // Vérifier toutes les secondes
-
-    return () => clearInterval(interval);
-  }, [subscribers, loading, error, initialized]);
-
   useEffect(() => {
     // Si déjà initialisé globalement, utiliser les données en cache
     if (globalInitialized) {
@@ -141,6 +115,16 @@ export const useAirtable = () => {
       setInitialized(true);
       
       console.log('✅ useAirtable: Données synchronisées - Abonnés:', subscribersData.length);
+      
+      // Forcer la mise à jour de tous les composants qui utilisent ce hook
+      setTimeout(() => {
+        console.log('🔄 useAirtable: Notification de mise à jour globale');
+        // Déclencher un événement personnalisé pour notifier tous les composants
+        window.dispatchEvent(new CustomEvent('airtable-data-updated', {
+          detail: { subscribers: subscribersData, count: subscribersData.length }
+        }));
+      }, 100);
+      
     } catch (err) {
       console.error('❌ Erreur Airtable:', err);
       const errorMessage = `Erreur de chargement Airtable: ${err instanceof Error ? err.message : 'Erreur inconnue'}`;

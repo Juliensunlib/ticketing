@@ -50,6 +50,20 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
     });
   }, [initialized, subscribers.length, airtableError, isAirtableAvailable, airtableLoading]);
 
+  // Écouter les mises à jour globales d'Airtable
+  useEffect(() => {
+    const handleAirtableUpdate = (event: CustomEvent) => {
+      console.log('🔄 TicketForm: Mise à jour Airtable reçue:', event.detail);
+      // Forcer un re-render en mettant à jour un état local
+      setFormData(prev => ({ ...prev }));
+    };
+
+    window.addEventListener('airtable-data-updated', handleAirtableUpdate as EventListener);
+    return () => {
+      window.removeEventListener('airtable-data-updated', handleAirtableUpdate as EventListener);
+    };
+  }, []);
+
   // Filtrer les abonnés selon le terme de recherche
   useEffect(() => {
     if (!searchTerm.trim()) {
