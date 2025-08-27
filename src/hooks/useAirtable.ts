@@ -47,6 +47,24 @@ export const useAirtable = () => {
   const [error, setError] = useState<string | null>(globalError);
   const [initialized, setInitialized] = useState(globalInitialized);
 
+  // Synchroniser avec l'état global quand il change
+  useEffect(() => {
+    const syncWithGlobal = () => {
+      setSubscribers(globalSubscribers);
+      setLoading(globalLoading);
+      setError(globalError);
+      setInitialized(globalInitialized);
+    };
+
+    // Synchroniser immédiatement
+    syncWithGlobal();
+
+    // Vérifier périodiquement les changements (pour les composants qui se montent après)
+    const interval = setInterval(syncWithGlobal, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     // Si déjà initialisé globalement, utiliser les données en cache
     if (globalInitialized) {
