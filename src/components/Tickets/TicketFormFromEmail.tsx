@@ -1,169 +1,272 @@
-import { useState, useEffect } from 'react';
-import AirtableService from '../services/airtable';
-import { Subscriber } from '../types';
+import React, { useState, useEffect } from 'react';
+import { X, Save, Mail, User, AlertCircle } from 'lucide-react';
+import { useTickets } from '../../hooks/useTickets';
+import { useAirtable } from '../../hooks/useAirtable';
+import { useSupabaseUsers } from '../../hooks/useSupabaseUsers';
 
-// Configuration depuis les variables d'environnement
-const getAirtableConfig = () => {
-  const apiKey = import.meta.env.VITE_AIRTABLE_API_KEY;
-  const subscribersBaseId = import.meta.env.VITE_AIRTABLE_SUBSCRIBERS_BASE_ID;
+interface Email {
+  id: string;
+  subject: string;
+  from: string;
+  date: string;
+  snippet: string;
+  body?: string;
+  hasAttachments: boolean;
+  isRead: boolean;
+}
 
-  // Logs uniquement en mode développement et si les variables sont définies
-  if (import.meta.env.DEV && (apiKey || subscribersBaseId)) {
-    console.log('🔍 Configuration Airtable:');
-    console.log('- API Key:', apiKey ? `${apiKey.substring(0, 8)}...` : 'MANQUANTE');
-    console.log('- Base ID:', subscribersBaseId || 'MANQUANTE');
-  }
+interface TicketFormFromEmailProps {
+  email: Email;
+  onClose: () => void;
+  onSuccess: () => void;
+}
 
-  if (!apiKey || !subscribersBaseId || 
-      apiKey === 'votre_clé_api_airtable' || 
-      subscribersBaseId === 'id_de_votre_base_abonnés' ||
-      apiKey.trim() === '' || 
-      subscribersBaseId.trim() === '') {
-    // Ne pas afficher d'avertissement si on est en production (variables dans Vercel)
-    if (import.meta.env.DEV) {
-      console.info('ℹ️ Configuration Airtable locale non trouvée. Mode saisie manuelle activé.');
-    }
-    return null;
-  }
-
-  return { apiKey, subscribersBaseId };
-};
-
-export const useAirtable = () => {
-  const [airtableService, setAirtableService] = useState<AirtableService | null>(null);
-  const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
+const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClose, onSuccess }) => {
+  const { createTicket } = useTickets();
+  const { subscribers } = useAirtable();
+  const { users } = useSupabaseUsers();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [initialized, setInitialized] = useState(false);
+  const [formData, setFormData] = useState({
+    title: email.subject || 'Email reçu',
+    description: `Email reçu de: ${email.from}\nDate: ${new Date(email.date).toLocaleString('fr-FR')}\nSujet: ${email.subject}\n\n${email.body || email.snippet}`,
+    priority: 'Moyenne' as const,
+    status: 'Nouveau' as const,
+    type: 'SAV / question technique' as const,
+    origin: 'Abonné' as const,
+    channel: 'Mail' as const,
+    assignedTo: '',
+    subscriberId: '',
+    installerId: '',
+  });
 
+  // Essayer de détecter automatiquement l'abonné depuis l'email
   useEffect(() => {
-    const service = config ? new AirtableService(config.apiKey, config.subscribersBaseId) : null;
-    
-      console.log('✅ Configuration Airtable trouvée, chargement des données...');
-      setLoading(true);
-      setError(null);
+    const detectSubscriber = () => {
+      const emailAddress = email.from.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/)?.[1];
+      const fromName = email.from.replace(/<.*>/, '').trim();
       
-      try {
-        let subscribersData: Subscriber[] = [];
-
-        try {
-          console.log('📋 Récupération des abonnés...');
-          console.log('🔄 Chargement des abonnés Airtable...');
-          subscribersData = await service.getSubscribers();
-          console.log(`✅ ${subscribersData.length} abonnés récupérés avec succès`);
-          console.log('✅ Abonnés chargés:', subscribersData.length);
-        } catch (err) {
-          console.error('❌ Erreur Airtable:', err);
-          setError(`ERREUR CRITIQUE Airtable: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
-          // Airtable non disponible - continuer avec tableau vide
-        }
-
-        setSubscribers(subscribersData);
+      if (emailAddress) {
+        // Chercher par email
+        const subscriberByEmail = subscribers.find(sub => 
+          sub.email?.toLowerCase() === emailAddress.toLowerCase()
+        );
         
-      } catch (err) {
-        console.error('❌ Erreur générale lors du chargement:', err);
-        setError(`ERREUR GÉNÉRALE: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
-      } finally {
-        setLoading(false);
+        if (subscriberByEmail) {
+          setFormData(prev => ({
+            ...prev,
+            subscriberId: `${subscriberByEmail.prenom} ${subscriberByEmail.nom} - ${subscriberByEmail.contratAbonne}`
+          }));
+          return;
+        }
       }
+      
+      if (fromName) {
+        // Chercher par nom
+        const subscriberByName = subscribers.find(sub => {
+          const fullName = `${sub.prenom} ${sub.nom}`.toLowerCase();
+          return fullName.includes(fromName.toLowerCase()) || fromName.toLowerCase().includes(fullName);
+        });
+        
+        if (subscriberByName) {
+          setFormData(prev => ({
+            ...prev,
+            subscriberId: `${subscriberByName.prenom} ${subscriberByName.nom} - ${subscriberByName.contratAbonne}`
+          }));
+          return;
+        }
+      }
+      
+      // Si aucun abonné trouvé, utiliser l'email comme identifiant
+      setFormData(prev => ({
+        ...prev,
+        subscriberId: `Autre - ${email.from}`
+      }));
     };
 
-    if (config) {
-      console.log('✅ Configuration Airtable trouvée, chargement des données...');
-      console.log('✅ Configuration Airtable trouvée, chargement des données...');
-      setAirtableService(service);
-      // Charger les données en arrière-plan sans bloquer l'interface
-      loadDataWithService(service).catch((error) => {
-        console.error('Erreur lors du chargement initial des données Airtable:', error);
-        // Ne pas bloquer l'interface même en cas d'erreur
-        setError(`Connexion Airtable impossible: ${error.message}`);
-      }).finally(() => {
-        setInitialized(true);
-      });
-    } else {
-    // Timeout de sécurité pour éviter le blocage
-    const timeout = setTimeout(() => {
-      if (!initialized) {
-        console.warn('⚠️ Timeout d\'initialisation Airtable, déblocage forcé');
-        setInitialized(true);
-        setLoading(false);
-      }
-    }, 5000); // 5 secondes maximum
-    
-    return () => clearTimeout(timeout);
-  }, []);
-
-  const loadData = async () => {
-    console.log('🔄 useAirtable: Rechargement manuel des données...');
-    if (!airtableService) {
-      console.warn('⚠️ Service Airtable non initialisé. Vérifiez la configuration dans le fichier .env');
-      setError('Configuration Airtable manquante. Vérifiez les variables d\'environnement VITE_AIRTABLE_API_KEY et VITE_AIRTABLE_SUBSCRIBERS_BASE_ID dans votre fichier .env');
-      return;
+    if (subscribers.length > 0) {
+      detectSubscriber();
     }
+  }, [email, subscribers]);
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true);
-    setError(null);
 
     try {
-      console.log('Rechargement des données Airtable...');
-      
-      const subscribersData = await airtableService.getSubscribers();
-
-      console.log('Abonnés récupérés:', subscribersData);
-
-      setSubscribers(subscribersData);
-      setError(null); // Réinitialiser l'erreur en cas de succès
-    } catch (err) {
-      console.error('Erreur lors du chargement des données Airtable:', err);
-      if (err instanceof Error && err.message.includes('Failed to fetch')) {
-        setError('Connexion à Airtable impossible. Contactez l\'administrateur si le problème persiste.');
-      } else {
-        setError(`Erreur lors du rechargement: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
-      }
+      await createTicket(formData);
+      onSuccess();
+      onClose();
+    } catch (error) {
+      console.error('Erreur lors de la création du ticket:', error);
+      alert(`Erreur lors de la création: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
     } finally {
       setLoading(false);
     }
   };
 
-  const createTicket = async (ticketData: any) => {
-    console.log('🎫 useAirtable: Création de ticket...');
-    if (!airtableService) {
-      console.warn('Service Airtable non configuré, ticket créé uniquement dans Supabase');
-      return null;
-    }
-    
-    try {
-      return await airtableService.createTicketRecord(ticketData);
-    } catch (error) {
-      console.error('❌ Erreur création ticket Airtable:', error);
-      // Ne pas faire échouer la création si Airtable échoue
-      return null;
-    }
-  };
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+              <Mail className="w-5 h-5 mr-2 text-orange-500" />
+              Créer un ticket depuis un email
+            </h2>
+            <button
+              onClick={onClose}
+              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
 
-  const updateTicket = async (recordId: string, ticketData: any) => {
-    console.log('🔄 useAirtable: Mise à jour de ticket...');
-    if (!airtableService) {
-      console.warn('Service Airtable non configuré, mise à jour uniquement dans Supabase');
-      return null;
-    }
-    
-    try {
-      return await airtableService.updateTicketRecord(recordId, ticketData);
-    } catch (error) {
-      console.error('❌ Erreur mise à jour ticket Airtable:', error);
-      // Ne pas faire échouer la mise à jour si Airtable échoue
-      return null;
-    }
-  };
+        {/* Aperçu de l'email */}
+        <div className="p-6 bg-blue-50 border-b border-blue-200">
+          <h3 className="text-sm font-medium text-blue-900 mb-2">Email source :</h3>
+          <div className="space-y-1 text-sm">
+            <p><span className="font-medium text-blue-800">De :</span> {email.from}</p>
+            <p><span className="font-medium text-blue-800">Sujet :</span> {email.subject}</p>
+            <p><span className="font-medium text-blue-800">Date :</span> {new Date(email.date).toLocaleString('fr-FR')}</p>
+          </div>
+        </div>
 
-  return {
-    subscribers,
-    loading,
-    error,
-    initialized,
-    loadData,
-    createTicket,
-    updateTicket,
-  };
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Titre */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Titre du ticket *
+            </label>
+            <input
+              type="text"
+              value={formData.title}
+              onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              required
+            />
+          </div>
+
+          {/* Abonné */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Abonné *
+            </label>
+            <input
+              type="text"
+              value={formData.subscriberId}
+              onChange={(e) => setFormData(prev => ({ ...prev, subscriberId: e.target.value }))}
+              placeholder="Nom de l'abonné ou contrat"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              required
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Détecté automatiquement depuis l'email ou modifiez si nécessaire
+            </p>
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Description *
+            </label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              rows={8}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              required
+            />
+          </div>
+
+          {/* Grille des champs */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Priorité */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Priorité
+              </label>
+              <select
+                value={formData.priority}
+                onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value as any }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              >
+                <option value="Basse">Basse</option>
+                <option value="Moyenne">Moyenne</option>
+                <option value="Haute">Haute</option>
+              </select>
+            </div>
+
+            {/* Type */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Type
+              </label>
+              <select
+                value={formData.type}
+                onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as any }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              >
+                <option value="SAV / question technique">SAV / question technique</option>
+                <option value="Recouvrement">Recouvrement</option>
+                <option value="Plainte Installateur">Plainte Installateur</option>
+                <option value="changement date prélèvement/RIB">changement date prélèvement/RIB</option>
+                <option value="Résiliation anticipée / cession de contrat">Résiliation anticipée / cession de contrat</option>
+                <option value="Ajout contrat / Flexibilité">Ajout contrat / Flexibilité</option>
+              </select>
+            </div>
+
+            {/* Assigné à */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Assigné à
+              </label>
+              <select
+                value={formData.assignedTo}
+                onChange={(e) => setFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              >
+                <option value="">Non assigné</option>
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Boutons */}
+          <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white rounded-lg transition-colors flex items-center"
+            >
+              {loading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Création...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Créer le ticket
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 };
+
+export default TicketFormFromEmail;
