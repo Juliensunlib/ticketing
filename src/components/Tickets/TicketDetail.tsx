@@ -281,13 +281,34 @@ Priorité: ${currentTicket.priority}`;
   const getEmailFromDescription = () => {
     if (!isFromEmail()) return null;
     
-    // Chercher "Email reçu de: email@domain.com"
-    const emailMatch = currentTicket.description.match(/Email reçu de:\s*([^\s\n]+@[^\s\n]+)/);
-    if (emailMatch) return emailMatch[1];
+    console.log('🔍 === EXTRACTION EMAIL DEPUIS DESCRIPTION ===');
+    console.log('🔍 Description du ticket:', currentTicket.description);
     
-    // Chercher "De: email@domain.com" ou "De: Nom <email@domain.com>"
-    const fromMatch = currentTicket.description.match(/De:\s*(?:[^<]*<)?([^\s<>\n]+@[^\s<>\n]+)/);
-    if (fromMatch) return fromMatch[1];
+    // 1. Chercher "Email reçu de: Nom <email@domain.com>" ou "Email reçu de: email@domain.com"
+    const emailRecuMatch = currentTicket.description.match(/Email reçu de:\s*(?:[^<]*<)?([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})>?/);
+    if (emailRecuMatch) {
+      console.log('✅ Email trouvé avec "Email reçu de:":', emailRecuMatch[1]);
+      return emailRecuMatch[1];
+    }
+    console.log('❌ Pas d\'email trouvé avec "Email reçu de:"');
+    
+    // 2. Chercher "De: Nom <email@domain.com>" ou "De: email@domain.com"
+    const fromMatch = currentTicket.description.match(/De:\s*(?:[^<]*<)?([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})>?/);
+    if (fromMatch) {
+      console.log('✅ Email trouvé avec "De:":', fromMatch[1]);
+      return fromMatch[1];
+    }
+    console.log('❌ Pas d\'email trouvé avec "De:"');
+    
+    // 3. Chercher n'importe quel email dans la description
+    const anyEmailMatch = currentTicket.description.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+    if (anyEmailMatch) {
+      console.log('✅ Email trouvé (recherche générale):', anyEmailMatch[1]);
+      return anyEmailMatch[1];
+    }
+    console.log('❌ Aucun email trouvé dans la description');
+    
+    console.log('🔍 === FIN EXTRACTION ===');
     
     return null;
   };
