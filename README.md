@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import AirtableService from '../services/airtable';
+import AirtableService from '../services/AirtableService';
 import { Subscriber } from '../types';
 
 // Configuration depuis les variables d'environnement
