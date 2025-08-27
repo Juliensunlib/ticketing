@@ -13,16 +13,41 @@ export default class AirtableService {
 
   private async makeRequest(endpoint: string, options: RequestInit = {}) {
     const url = `${this.baseUrl}${endpoint}`;
+    
+    console.log('🌐 Requête Airtable:', {
+      url,
+      method: options.method || 'GET',
+      hasAuth: !!this.apiKey
+    });
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // Timeout de 30 secondes
+    
     const response = await fetch(url, {
       ...options,
+      signal: controller.signal,
       headers: {
         'Authorization': `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
         ...options.headers,
       },
+    }).finally(() => {
+      clearTimeout(timeoutId);
+    });
+
+    console.log('📡 Réponse Airtable:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Erreur Airtable détaillée:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText
+      });
       throw new Error(`Airtable API error: ${response.status} ${response.statusText}`);
     }
 
@@ -36,23 +61,35 @@ export default class AirtableService {
     
     let allRecords: any[] = [];
     let offset: string | undefined;
+    let pageCount = 0;
+    const maxPages = 10; // Limite de sécurité pour éviter les boucles infinies
     
     do {
+      pageCount++;
+      if (pageCount > maxPages) {
+        console.warn('⚠️ Limite de pages atteinte, arrêt du chargement');
+        break;
+      }
+      
       const params = new URLSearchParams({
         pageSize: '100',
         ...(offset && { offset })
       });
       
-      console.log(`📊 Airtable: Récupération de la page ${Math.floor(allRecords.length / 100) + 1}...`);
+      console.log(`📊 Airtable: Récupération de la page ${pageCount}...`);
       console.log(`📊 URL complète: ${this.baseUrl}/Abonnés?${params}`);
       
       let response: any;
       try {
+        const startTime = Date.now();
         response = await this.makeRequest(`/Abonnés?${params}`);
+        const endTime = Date.now();
+        console.log(`⏱️ Requête terminée en ${endTime - startTime}ms`);
+        
         console.log('📊 Réponse reçue:', {
           recordsCount: response.records?.length || 0,
           hasOffset: !!response.offset,
-          firstRecord: response.records?.[0]?.fields || 'Aucun'
+          firstRecord: response.records?.[0]?.fields ? 'Présent' : 'Aucun'
         });
       
         allRecords = [...allRecords, ...response.records];
@@ -61,7 +98,8 @@ export default class AirtableService {
         console.error('❌ Erreur lors de la requête Airtable:', error);
         console.error('❌ Détails de l\'erreur:', {
           message: error instanceof Error ? error.message : 'Erreur inconnue',
-          stack: error instanceof Error ? error.stack : 'Pas de stack'
+          name: error instanceof Error ? error.name : 'Erreur inconnue',
+          url: `${this.baseUrl}/Abonnés?${params}`
         });
         throw error;
       }
@@ -73,6 +111,14 @@ export default class AirtableService {
     } while (offset);
 
     console.log(`✅ Airtable: ${allRecords.length} abonnés récupérés au total`);
+
+    // Vérifier si on a des données
+    if (allRecords.length === 0) {
+      console.warn('⚠️ Aucun abonné récupéré. Vérifiez:');
+      console.warn('- Le nom de la table (doit être exactement "Abonnés")');
+      console.warn('- Les permissions de l\'API Key');
+      console.warn('- La structure de la base Airtable');
+    }
 
     return allRecords.map((record: any) => ({
       id: record.id,

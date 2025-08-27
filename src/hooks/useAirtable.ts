@@ -62,7 +62,7 @@ export const useAirtable = () => {
       console.log('❌ useAirtable: Configuration Airtable manquante');
       setInitialized(true);
     }
-  }, []); // Pas de dépendances pour éviter les réinitialisations
+  }, []); // Exécuter une seule fois au montage
 
   const loadDataWithService = async (service: AirtableService) => {
     console.log('🔄 useAirtable: Chargement des données...');
