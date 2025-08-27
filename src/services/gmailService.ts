@@ -372,6 +372,31 @@ class GmailService {
     }
   }
 
+  async deleteEmail(messageId: string): Promise<void> {
+    try {
+      console.log('🗑️ Suppression de l\'email:', messageId);
+      
+      await this.makeGmailRequest(`messages/${messageId}`, 'DELETE');
+      
+      console.log('✅ Email supprimé avec succès de Gmail');
+    } catch (error) {
+      console.error('❌ Erreur lors de la suppression de l\'email:', error);
+      throw error;
+    }
+  }
+
+  async trashEmail(messageId: string): Promise<void> {
+    try {
+      console.log('🗑️ Déplacement de l\'email vers la corbeille:', messageId);
+      
+      await this.makeGmailRequest(`messages/${messageId}/trash`, 'POST');
+      
+      console.log('✅ Email déplacé vers la corbeille Gmail');
+    } catch (error) {
+      console.error('❌ Erreur lors du déplacement vers la corbeille:', error);
+      throw error;
+    }
+  }
   private parseMessage(message: GmailMessage): any {
     const headers = message.payload.headers;
     const subject = headers.find(h => h.name === 'Subject')?.value || 'Sans sujet';

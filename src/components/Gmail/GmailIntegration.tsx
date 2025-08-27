@@ -35,6 +35,7 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
   const [showAttachToTicket, setShowAttachToTicket] = useState(false);
   const [selectedEmailForAttach, setSelectedEmailForAttach] = useState<Email | null>(null);
   const [ticketSearchTerm, setTicketSearchTerm] = useState('');
+  const [showDeleteOptions, setShowDeleteOptions] = useState<string | null>(null);
 
   // Récupérer addComment depuis useTickets au niveau du composant
   const { addComment } = useTickets();
@@ -215,9 +216,9 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
     }
   };
 
-  const handleDeleteEmail = (emailId: string, emailSubject: string) => {
-    if (confirm(`Êtes-vous sûr de vouloir supprimer définitivement l'email :\n"${emailSubject}" ?\n\nCette action est irréversible.`)) {
-      // Marquer l'email comme supprimé (même système que les emails traités)
+  const handleHideEmail = (emailId: string, emailSubject: string) => {
+    if (confirm(`Masquer l'email de l'outil :\n"${emailSubject}" ?\n\nL'email restera dans Gmail mais sera masqué de cet outil.`)) {
+      // Marquer l'email comme masqué (même système que les emails traités)
       const newProcessedEmails = new Set(processedEmails);
       newProcessedEmails.add(emailId);
       setProcessedEmails(newProcessedEmails);
@@ -233,6 +234,53 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
     }
   };
 
+  const handleTrashEmail = async (emailId: string, emailSubject: string) => {
+    if (confirm(`Déplacer l'email vers la corbeille Gmail :\n"${emailSubject}" ?\n\nL'email sera déplacé dans la corbeille Gmail.`)) {
+      try {
+        setLoading(true);
+        await gmailService.trashEmail(emailId);
+        
+        // Retirer de la liste locale
+        setEmails(prev => prev.filter(email => email.id !== emailId));
+        
+        // Si c'était l'email sélectionné, le désélectionner
+        if (selectedEmail?.id === emailId) {
+          setSelectedEmail(null);
+        }
+        
+        alert('Email déplacé vers la corbeille Gmail avec succès !');
+      } catch (error) {
+        console.error('Erreur lors du déplacement vers la corbeille:', error);
+        alert('Erreur lors du déplacement vers la corbeille Gmail');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleDeleteEmailPermanently = async (emailId: string, emailSubject: string) => {
+    if (confirm(`⚠️ ATTENTION : Supprimer définitivement l'email de Gmail :\n"${emailSubject}" ?\n\n🚨 Cette action est IRRÉVERSIBLE !\nL'email sera supprimé définitivement de Gmail.`)) {
+      try {
+        setLoading(true);
+        await gmailService.deleteEmail(emailId);
+        
+        // Retirer de la liste locale
+        setEmails(prev => prev.filter(email => email.id !== emailId));
+        
+        // Si c'était l'email sélectionné, le désélectionner
+        if (selectedEmail?.id === emailId) {
+          setSelectedEmail(null);
+        }
+        
+        alert('Email supprimé définitivement de Gmail !');
+      } catch (error) {
+        console.error('Erreur lors de la suppression définitive:', error);
+        alert('Erreur lors de la suppression définitive de Gmail');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
   const handleAttachToExistingTicket = (email: Email) => {
     setSelectedEmailForAttach(email);
     setShowAttachToTicket(true);
@@ -714,13 +762,50 @@ ${selectedEmailForAttach.body || selectedEmailForAttach.snippet}`;
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDeleteEmail(email.id, email.subject);
+                           setShowDeleteOptions(email.id);
                           }}
-                          className="text-xs px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded transition-colors flex items-center"
-                          title="Supprimer cet email de la liste"
+                         className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition-colors flex items-center"
+                         title="Options de suppression"
                         >
-                          <X className="w-3 h-3" />
+                         ⋮
                         </button>
+                       
+                       {/* Menu déroulant des options de suppression */}
+                       {showDeleteOptions === email.id && (
+                         <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-48">
+                           <button
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               handleHideEmail(email.id, email.subject);
+                               setShowDeleteOptions(null);
+                             }}
+                             className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                           >
+                             <X className="w-4 h-4 mr-2" />
+                             Masquer de l'outil
+                           </button>
+                           <button
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               handleTrashEmail(email.id, email.subject);
+                               setShowDeleteOptions(null);
+                             }}
+                             className="w-full text-left px-3 py-2 text-sm text-orange-700 hover:bg-orange-50 flex items-center"
+                           >
+                             🗑️ Corbeille Gmail
+                           </button>
+                           <button
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               handleDeleteEmailPermanently(email.id, email.subject);
+                               setShowDeleteOptions(null);
+                             }}
+                             className="w-full text-left px-3 py-2 text-sm text-red-700 hover:bg-red-50 flex items-center border-t border-gray-200"
+                           >
+                             ⚠️ Supprimer définitivement
+                           </button>
+                         </div>
+                       )}
                       </div>
                     ) : (
                       <div className="flex items-center space-x-1">
@@ -889,9 +974,42 @@ ${selectedEmailForAttach.body || selectedEmailForAttach.snippet}`;
                     className="px-4 py-2 border border-red-300 hover:bg-red-50 text-red-700 rounded-lg transition-colors flex items-center"
                     title="Supprimer cet email"
                   >
-                    <X className="w-4 h-4 mr-2" />
-                    Supprimer
+                    ⋮ Options
                   </button>
+                  
+                  {/* Menu déroulant pour l'email sélectionné */}
+                  {showDeleteOptions === selectedEmail.id && (
+                    <div className="absolute right-0 top-12 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-48">
+                      <button
+                        onClick={() => {
+                          handleHideEmail(selectedEmail.id, selectedEmail.subject);
+                          setShowDeleteOptions(null);
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                      >
+                        <X className="w-4 h-4 mr-2" />
+                        Masquer de l'outil
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleTrashEmail(selectedEmail.id, selectedEmail.subject);
+                          setShowDeleteOptions(null);
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-orange-700 hover:bg-orange-50 flex items-center"
+                      >
+                        🗑️ Corbeille Gmail
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleDeleteEmailPermanently(selectedEmail.id, selectedEmail.subject);
+                          setShowDeleteOptions(null);
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-red-700 hover:bg-red-50 flex items-center border-t border-gray-200"
+                      >
+                        ⚠️ Supprimer définitivement
+                      </button>
+                    </div>
+                  )}
                   <button
                     onClick={() => setShowReplyForm(!showReplyForm)}
                     className="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors flex items-center"
@@ -954,6 +1072,14 @@ ${selectedEmailForAttach.body || selectedEmailForAttach.snippet}`;
           )}
         </div>
       </div>
+
+      {/* Overlay pour fermer le menu des options */}
+      {showDeleteOptions && (
+        <div 
+          className="fixed inset-0 z-5"
+          onClick={() => setShowDeleteOptions(null)}
+        />
+      )}
 
       {/* Modal d'attachement à un ticket existant */}
       {showAttachToTicket && selectedEmailForAttach && (
