@@ -14,6 +14,11 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
   const { subscribers, loading: airtableLoading, error: airtableError, initialized } = useAirtable();
   const { createTicket, loading: createLoading } = useTickets();
   const { users } = useSupabaseUsers();
+  
+  // État local pour forcer les re-renders
+  const [localSubscribers, setLocalSubscribers] = useState(subscribers);
+  const [localInitialized, setLocalInitialized] = useState(initialized);
+  const [localError, setLocalError] = useState(airtableError);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -38,18 +43,25 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
   const [localForceUpdate, setLocalForceUpdate] = useState(0);
 
   // Vérifier si Airtable est disponible
-  const isAirtableAvailable = initialized && subscribers.length > 0 && !airtableError;
+  const isAirtableAvailable = localInitialized && localSubscribers.length > 0 && !localError;
 
   // Debug pour voir l'état en temps réel
   useEffect(() => {
     console.log('🔍 TicketForm - État Airtable:', {
-      initialized,
-      subscribersCount: subscribers.length,
-      hasError: !!airtableError,
+      initialized: localInitialized,
+      subscribersCount: localSubscribers.length,
+      hasError: !!localError,
       isAvailable: isAirtableAvailable,
       loading: airtableLoading
     });
-  }, [initialized, subscribers.length, airtableError, isAirtableAvailable, airtableLoading]);
+  }, [localInitialized, localSubscribers.length, localError, isAirtableAvailable, airtableLoading]);
+
+  // Synchroniser les états globaux avec les états locaux
+  useEffect(() => {
+    setLocalSubscribers(subscribers);
+    setLocalInitialized(initialized);
+    setLocalError(airtableError);
+  }, [subscribers, initialized, airtableError]);
 
   // Écouter les mises à jour globales d'Airtable
   useEffect(() => {
@@ -57,6 +69,11 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
       console.log('🔄 TicketForm: Mise à jour Airtable reçue:', event.detail);
       
       // Forcer la mise à jour des états avec les données globales
+      setLocalSubscribers(event.detail.subscribers || []);
+      setLocalInitialized(event.detail.initialized || false);
+      setLocalError(event.detail.error || null);
+      
+      // Données pour debug
       const { subscribers: newSubscribers, count, initialized, error } = event.detail;
       console.log('🔄 TicketForm: Application des nouvelles données:', {
         newCount: count,
@@ -68,7 +85,7 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
       // Forcer un re-render complet du composant
       setLocalForceUpdate(prev => prev + 1);
       
-      // Forcer une nouvelle évaluation de isAirtableAvailable
+      // Vérification post-mise à jour
       setTimeout(() => {
         console.log('🔍 TicketForm: Vérification post-mise à jour:', {
           subscribersLength: subscribers.length,
@@ -84,14 +101,14 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
     return () => {
       window.removeEventListener('airtable-data-updated', handleAirtableUpdate as EventListener);
     };
-  }, [subscribers.length, initialized, airtableError, localForceUpdate]);
+  }, [localForceUpdate]);
 
   // Filtrer les abonnés selon le terme de recherche
   useEffect(() => {
     if (!searchTerm.trim()) {
-      setFilteredSubscribers(subscribers);
+      setFilteredSubscribers(localSubscribers);
     } else {
-      const filtered = subscribers.filter(subscriber => {
+      const filtered = localSubscribers.filter(subscriber => {
         const fullName = `${subscriber.prenom} ${subscriber.nom}`.toLowerCase();
         const contract = subscriber.contratAbonne.toLowerCase();
         const email = subscriber.email?.toLowerCase() || '';
@@ -105,14 +122,14 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
       });
       setFilteredSubscribers(filtered);
     }
-  }, [searchTerm, subscribers]);
+  }, [searchTerm, localSubscribers]);
 
   useEffect(() => {
     console.log('TicketForm: Chargement des abonnés...');
-    console.log('- Abonnés disponibles:', subscribers.length);
-    console.log('- Airtable initialisé:', initialized);
-    console.log('- Erreur Airtable:', airtableError);
-  }, [subscribers, initialized, airtableError]);
+    console.log('- Abonnés disponibles:', localSubscribers.length);
+    console.log('- Airtable initialisé:', localInitialized);
+    console.log('- Erreur Airtable:', localError);
+  }, [localSubscribers, localInitialized, localError]);
 
   const handleSubscriberSelect = (subscriber: any) => {
     setSelectedSubscriber(subscriber.id);
@@ -255,7 +272,7 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
                 <div className="space-y-3">
                   <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
                     <p className="text-sm text-green-800">
-                      ✅ {subscribers.length} abonnés disponibles depuis Airtable
+                      ✅ {localSubscribers.length} abonnés disponibles depuis Airtable
                     </p>
                   </div>
                   
@@ -327,10 +344,10 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
                     <span className="font-medium">Mode saisie manuelle</span>
                   </div>
                   <p className="text-sm text-yellow-700">
-                    Airtable non disponible ({airtableError || 'Configuration manquante'}). Saisissez manuellement les informations de l'abonné.
+                    Airtable non disponible ({localError || 'Configuration manquante'}). Saisissez manuellement les informations de l'abonné.
                   </p>
                   <p className="text-xs text-yellow-600 mt-1">
-                    Abonnés chargés: {subscribers.length} | Initialisé: {initialized ? 'Oui' : 'Non'}
+                    Abonnés chargés: {localSubscribers.length} | Initialisé: {localInitialized ? 'Oui' : 'Non'}
                   </p>
                 </div>
               )}
