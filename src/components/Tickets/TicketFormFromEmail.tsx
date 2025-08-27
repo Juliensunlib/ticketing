@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Mail, User, AlertCircle } from 'lucide-react';
+import { X, Save, Mail, User, AlertCircle, Search } from 'lucide-react';
 import { useTickets } from '../../hooks/useTickets';
 import { useAirtable } from '../../hooks/useAirtable';
 import { useSupabaseUsers } from '../../hooks/useSupabaseUsers';
