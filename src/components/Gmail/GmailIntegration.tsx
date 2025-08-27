@@ -54,6 +54,24 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
     }
   }, []);
 
+  // Recharger les emails traités quand on revient sur la page
+  useEffect(() => {
+    const handleFocus = () => {
+      const stored = localStorage.getItem('processed_emails');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          setProcessedEmails(new Set(parsed));
+        } catch (error) {
+          console.error('Erreur parsing processed_emails:', error);
+        }
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
+
   // Sauvegarder les emails traités
   const saveProcessedEmails = (emailIds: Set<string>) => {
     localStorage.setItem('processed_emails', JSON.stringify([...emailIds]));

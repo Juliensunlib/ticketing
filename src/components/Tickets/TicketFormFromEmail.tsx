@@ -143,11 +143,6 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
       
       createTicket(ticketData);
       
-      // Marquer l'email comme traité dans le localStorage
-      const processedEmails = JSON.parse(localStorage.getItem('processed_emails') || '[]');
-      processedEmails.push(email.id);
-      localStorage.setItem('processed_emails', JSON.stringify(processedEmails));
-      
       onSuccess();
       onClose();
     } catch (error) {

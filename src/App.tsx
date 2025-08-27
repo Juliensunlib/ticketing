@@ -83,6 +83,16 @@ const AppContent: React.FC = () => {
   const handleEmailTicketFormSuccess = () => {
     setShowEmailTicketForm(false);
     setSelectedEmail(null);
+    
+    // Marquer l'email comme traité
+    if (selectedEmail) {
+      const processedEmails = JSON.parse(localStorage.getItem('processed_emails') || '[]');
+      if (!processedEmails.includes(selectedEmail.id)) {
+        processedEmails.push(selectedEmail.id);
+        localStorage.setItem('processed_emails', JSON.stringify(processedEmails));
+      }
+    }
+    
     setActiveView('tickets'); // Rediriger vers la liste des tickets
     console.log('Ticket créé depuis email avec succès !');
   };
