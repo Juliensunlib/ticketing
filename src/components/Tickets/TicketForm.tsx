@@ -318,7 +318,7 @@ const TicketForm: React.FC<TicketFormProps> = ({ ticket, onClose, onSuccess }) =
                       onFocus={() => setShowSubscriberDropdown(true)}
                       placeholder={
                         airtableLoading ? 'Chargement des clients...' : 
-                        airtableError ? 'Erreur de chargement - Saisie manuelle possible' :
+                        airtableError ? 'Configuration Airtable manquante - Saisie manuelle' :
                         subscribers.length === 0 ? 'Aucun client trouvé - Saisie manuelle possible' : 
                         'Rechercher par nom, prénom ou contrat...'
                       }
@@ -338,9 +338,9 @@ const TicketForm: React.FC<TicketFormProps> = ({ ticket, onClose, onSuccess }) =
                         </div>
                       ) : airtableError ? (
                         <div className="px-4 py-3 text-center">
-                          <div className="text-sm text-red-600 mb-2">❌ Erreur de chargement</div>
+                          <div className="text-sm text-orange-600 mb-2">⚠️ Configuration Airtable manquante</div>
                           <div className="text-xs text-gray-500">
-                            Vous pouvez saisir manuellement : "Prénom Nom - SL-000123"
+                            Saisissez manuellement : "Prénom Nom - SL-000123"
                           </div>
                         </div>
                       ) : subscribers.length === 0 ? (
@@ -390,7 +390,10 @@ const TicketForm: React.FC<TicketFormProps> = ({ ticket, onClose, onSuccess }) =
                 {/* Informations de debug pour l'administrateur */}
                {airtableError && (
                   <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
-                    <strong>Erreur Airtable :</strong> {airtableError}
+                    <strong>Information :</strong> {airtableError}
+                    <div className="mt-1 text-xs text-gray-600">
+                      💡 Vérifiez que les variables VITE_AIRTABLE_API_KEY et VITE_AIRTABLE_SUBSCRIBERS_BASE_ID sont configurées dans votre fichier .env
+                    </div>
                   </div>
                 )}
                 

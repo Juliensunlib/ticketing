@@ -7,8 +7,16 @@ const getAirtableConfig = () => {
   const apiKey = import.meta.env.VITE_AIRTABLE_API_KEY;
   const subscribersBaseId = import.meta.env.VITE_AIRTABLE_SUBSCRIBERS_BASE_ID;
 
-  if (!apiKey || !subscribersBaseId || apiKey === 'votre_clé_api_airtable' || subscribersBaseId === 'id_de_votre_base_abonnés') {
-    console.warn('Configuration Airtable incomplète. Vérifiez votre fichier .env');
+  console.log('🔍 Configuration Airtable:');
+  console.log('- API Key:', apiKey ? `${apiKey.substring(0, 8)}...` : 'MANQUANTE');
+  console.log('- Base ID:', subscribersBaseId || 'MANQUANTE');
+
+  if (!apiKey || !subscribersBaseId || 
+      apiKey === 'votre_clé_api_airtable' || 
+      subscribersBaseId === 'id_de_votre_base_abonnés' ||
+      apiKey.trim() === '' || 
+      subscribersBaseId.trim() === '') {
+    console.warn('⚠️ Configuration Airtable incomplète. Vérifiez votre fichier .env');
     return null;
   }
 
@@ -38,9 +46,9 @@ export const useAirtable = () => {
         setInitialized(true);
       });
     } else {
-      console.warn('Configuration Airtable manquante');
+      console.warn('⚠️ Configuration Airtable manquante - Mode saisie manuelle activé');
       // Ne pas afficher d'erreur si la configuration est manquante
-      setError(null);
+      setError('Configuration Airtable manquante. Saisie manuelle disponible.');
       setInitialized(true);
     }
     
@@ -87,8 +95,8 @@ export const useAirtable = () => {
   const loadData = async () => {
     console.log('🔄 useAirtable: Rechargement manuel des données...');
     if (!airtableService) {
-      console.warn('Service Airtable non initialisé. Vérifiez la configuration dans le fichier .env');
-      setError('Service Airtable non configuré. Contactez l\'administrateur.');
+      console.warn('⚠️ Service Airtable non initialisé. Vérifiez la configuration dans le fichier .env');
+      setError('Configuration Airtable manquante. Vérifiez les variables d\'environnement VITE_AIRTABLE_API_KEY et VITE_AIRTABLE_SUBSCRIBERS_BASE_ID dans votre fichier .env');
       return;
     }
 
