@@ -1,177 +1,302 @@
-import { useState, useEffect } from 'react';
-import AirtableService from '../services/airtable';
-import { Subscriber } from '../types';
+import React, { useState, useEffect } from 'react';
+import { useAirtable } from '../../hooks/useAirtable';
+import { useSupabaseTickets } from '../../hooks/useSupabaseTickets';
+import { useSupabaseUsers } from '../../hooks/useSupabaseUsers';
+import { Send, User, Mail, AlertCircle, Clock, Flag } from 'lucide-react';
 
-// Configuration depuis les variables d'environnement
-const getAirtableConfig = () => {
-  const apiKey = import.meta.env.VITE_AIRTABLE_API_KEY;
-  const subscribersBaseId = import.meta.env.VITE_AIRTABLE_SUBSCRIBERS_BASE_ID;
+interface TicketFormProps {
+  onTicketCreated?: () => void;
+}
 
-  // Logs uniquement en mode développement et si les variables sont définies
-  if (import.meta.env.DEV && (apiKey || subscribersBaseId)) {
-    console.log('🔍 Configuration Airtable:');
-    console.log('- API Key:', apiKey ? `${apiKey.substring(0, 8)}...` : 'MANQUANTE');
-    console.log('- Base ID:', subscribersBaseId || 'MANQUANTE');
-  }
+export default function TicketForm({ onTicketCreated }: TicketFormProps) {
+  const { subscribers, loading: airtableLoading, error: airtableError, initialized } = useAirtable();
+  const { createTicket, loading: createLoading } = useSupabaseTickets();
+  const { users } = useSupabaseUsers();
 
-  if (!apiKey || !subscribersBaseId || 
-      apiKey === 'votre_clé_api_airtable' || 
-      subscribersBaseId === 'id_de_votre_base_abonnés' ||
-      apiKey.trim() === '' || 
-      subscribersBaseId.trim() === '') {
-    // Ne pas afficher d'avertissement si on est en production (variables dans Vercel)
-    if (import.meta.env.DEV) {
-      console.info('ℹ️ Configuration Airtable locale non trouvée. Mode saisie manuelle activé.');
-    }
-    return null;
-  }
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    priority: 'medium' as 'low' | 'medium' | 'high',
+    clientName: '',
+    clientEmail: '',
+    assignedTo: '',
+  });
 
-  return { apiKey, subscribersBaseId };
-};
+  const [isManualEntry, setIsManualEntry] = useState(false);
+  const [selectedSubscriber, setSelectedSubscriber] = useState('');
 
-export const useAirtable = () => {
-  const [airtableService, setAirtableService] = useState<AirtableService | null>(null);
-  const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [initialized, setInitialized] = useState(false);
+  // Vérifier si Airtable est disponible
+  const isAirtableAvailable = initialized && subscribers.length > 0 && !airtableError;
 
   useEffect(() => {
-    const config = getAirtableConfig();
-    
-    const loadDataWithService = async (service: AirtableService) => {
-      console.log('✅ Configuration Airtable trouvée, chargement des données...');
-      console.log('✅ Configuration Airtable trouvée, chargement des données...');
-      setError(null);
-      
-      try {
-        let subscribersData: Subscriber[] = [];
+    console.log('TicketForm: Chargement des abonnés...');
+    console.log('- Abonnés disponibles:', subscribers.length);
+    console.log('- Airtable initialisé:', initialized);
+    console.log('- Erreur Airtable:', airtableError);
+  }, [subscribers, initialized, airtableError]);
 
-        try {
-          console.log('🔄 Chargement des abonnés Airtable...');
-          subscribersData = await service.getSubscribers();
-          console.log('✅ Abonnés chargés:', subscribersData.length);
-        } catch (err) {
-          console.error('❌ Erreur Airtable:', err);
-          setError(`Erreur Airtable: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
-          // Airtable non disponible - continuer avec tableau vide
-        }
-
-        setSubscribers(subscribersData);
-        
-      } catch (err) {
-        console.error('❌ Erreur générale lors du chargement:', err);
-        setError(`Erreur générale: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const initializeAirtable = async () => {
-      const service = new AirtableService(config.apiKey, config.subscribersBaseId);
-      setAirtableService(service);
-      await loadDataWithService(service);
-    };
-
-    if (config) {
-      console.log('🚀 Initialisation du service Airtable...');
-      console.log('✅ Configuration Airtable trouvée, chargement des données...');
-      const service = new AirtableService(config.apiKey, config.subscribersBaseId);
-      setAirtableService(service);
-      // Charger les données en arrière-plan sans bloquer l'interface
-      initializeAirtable().catch((error) => {
-        console.error('Erreur lors du chargement initial des données Airtable:', error);
-        // Ne pas bloquer l'interface même en cas d'erreur
-        setError(`Connexion Airtable impossible: ${error.message}`);
-      }).finally(() => {
-        setInitialized(true);
-      });
+  const handleSubscriberChange = (value: string) => {
+    if (value === 'manual') {
+      setIsManualEntry(true);
+      setSelectedSubscriber('');
+      setFormData(prev => ({ ...prev, clientName: '', clientEmail: '' }));
     } else {
-      setTimeout(() => {
-        console.error('❌ Configuration Airtable invalide ou manquante');
-        setInitialized(true);
-      }, 5000); // 5 secondes maximum
-    }
-  }, []);
-
-  const loadData = async () => {
-    console.log('🔄 useAirtable: Rechargement manuel des données...');
-    if (!airtableService) {
-      console.warn('⚠️ Service Airtable non initialisé');
-      setError('Configuration Airtable manquante. Vérifiez les variables d\'environnement VITE_AIRTABLE_API_KEY et VITE_AIRTABLE_SUBSCRIBERS_BASE_ID dans votre fichier .env\n💡 Vérifiez que les variables VITE_AIRTABLE_API_KEY et VITE_AIRTABLE_SUBSCRIBERS_BASE_ID sont configurées dans votre fichier .env');
-      return;
-    }
-    
-    if (!airtableService) {
-      console.warn('⚠️ Service Airtable en cours d\'initialisation...');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      console.log('Rechargement des données Airtable...');
+      setIsManualEntry(false);
+      setSelectedSubscriber(value);
       
-      const subscribersData = await airtableService.getSubscribers();
-
-      console.log('Abonnés récupérés:', subscribersData);
-
-      setSubscribers(subscribersData);
-      setError(null); // Réinitialiser l'erreur en cas de succès
-    } catch (err) {
-      console.error('Erreur lors du chargement des données Airtable:', err);
-      if (err instanceof Error && err.message.includes('Failed to fetch')) {
-        setError('Connexion à Airtable impossible. Vérifiez votre connexion internet et les variables d\'environnement.');
-      } else {
-        setError(`Erreur lors du rechargement: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
+      const subscriber = subscribers.find(s => s.id === value);
+      if (subscriber) {
+        setFormData(prev => ({
+          ...prev,
+          clientName: subscriber.name,
+          clientEmail: subscriber.email
+        }));
       }
-    } finally {
-      setLoading(false);
     }
   };
 
-  const createTicket = async (ticketData: any) => {
-    console.log('🎫 useAirtable: Création de ticket...');
-    if (!airtableService) {
-      console.warn('Service Airtable non configuré, ticket créé uniquement dans Supabase');
-      return null;
-    }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     
+    if (!formData.title.trim() || !formData.description.trim()) {
+      alert('Veuillez remplir tous les champs obligatoires');
+      return;
+    }
+
+    if (!isManualEntry && !selectedSubscriber) {
+      alert('Veuillez sélectionner un client');
+      return;
+    }
+
+    if (isManualEntry && (!formData.clientName.trim() || !formData.clientEmail.trim())) {
+      alert('Veuillez remplir le nom et l\'email du client');
+      return;
+    }
+
     try {
-      return await airtableService.createTicketRecord(ticketData);
+      await createTicket({
+        title: formData.title,
+        description: formData.description,
+        priority: formData.priority,
+        client_name: formData.clientName,
+        client_email: formData.clientEmail,
+        assigned_to: formData.assignedTo || null,
+        status: 'open'
+      });
+
+      // Réinitialiser le formulaire
+      setFormData({
+        title: '',
+        description: '',
+        priority: 'medium',
+        clientName: '',
+        clientEmail: '',
+        assignedTo: '',
+      });
+      setSelectedSubscriber('');
+      setIsManualEntry(false);
+
+      if (onTicketCreated) {
+        onTicketCreated();
+      }
+
+      alert('Ticket créé avec succès !');
     } catch (error) {
-      console.error('❌ Erreur création ticket Airtable:', error);
-      // Ne pas faire échouer la création si Airtable échoue
-      return null;
+      console.error('Erreur lors de la création du ticket:', error);
+      alert('Erreur lors de la création du ticket');
     }
   };
 
-  const updateTicket = async (recordId: string, ticketData: any) => {
-    console.log('🔄 useAirtable: Mise à jour de ticket...');
-    if (!airtableService) {
-      console.warn('Service Airtable non configuré, mise à jour uniquement dans Supabase');
-      return null;
-    }
-    
-    try {
-      return await airtableService.updateTicketRecord(recordId, ticketData);
-    } catch (error) {
-      console.error('❌ Erreur mise à jour ticket Airtable:', error);
-      // Ne pas faire échouer la mise à jour si Airtable échoue
-      return null;
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high': return 'text-red-600 bg-red-50 border-red-200';
+      case 'medium': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+      case 'low': return 'text-green-600 bg-green-50 border-green-200';
+      default: return 'text-gray-600 bg-gray-50 border-gray-200';
     }
   };
 
-  console.log('✅ Configuration Airtable valide');
-  
-  return {
-    subscribers,
-    loading,
-    error,
-    initialized,
-    loadData,
-    createTicket,
-    updateTicket,
+  const getPriorityIcon = (priority: string) => {
+    switch (priority) {
+      case 'high': return <AlertCircle className="w-4 h-4" />;
+      case 'medium': return <Clock className="w-4 h-4" />;
+      case 'low': return <Flag className="w-4 h-4" />;
+      default: return <Flag className="w-4 h-4" />;
+    }
   };
-};
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="p-2 bg-blue-100 rounded-lg">
+          <Send className="w-5 h-5 text-blue-600" />
+        </div>
+        <h2 className="text-xl font-semibold text-gray-900">Nouveau Ticket</h2>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Sélection du client */}
+        <div className="space-y-4">
+          <label className="block text-sm font-medium text-gray-700">
+            Client *
+          </label>
+          
+          {isAirtableAvailable ? (
+            <div className="space-y-3">
+              <select
+                value={selectedSubscriber || (isManualEntry ? 'manual' : '')}
+                onChange={(e) => handleSubscriberChange(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                required={!isManualEntry}
+              >
+                <option value="">Sélectionner un client</option>
+                {subscribers.map((subscriber) => (
+                  <option key={subscriber.id} value={subscriber.id}>
+                    {subscriber.name} - {subscriber.email}
+                  </option>
+                ))}
+                <option value="manual">➕ Saisie manuelle</option>
+              </select>
+            </div>
+          ) : (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 text-yellow-800 mb-2">
+                <AlertCircle className="w-4 h-4" />
+                <span className="font-medium">Mode saisie manuelle</span>
+              </div>
+              <p className="text-sm text-yellow-700">
+                Saisissez manuellement les informations du client
+              </p>
+            </div>
+          )}
+
+          {/* Saisie manuelle ou Airtable non disponible */}
+          {(isManualEntry || !isAirtableAvailable) && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <User className="w-4 h-4 inline mr-1" />
+                  Nom du client *
+                </label>
+                <input
+                  type="text"
+                  value={formData.clientName}
+                  onChange={(e) => setFormData(prev => ({ ...prev, clientName: e.target.value }))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  placeholder="Nom complet du client"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <Mail className="w-4 h-4 inline mr-1" />
+                  Email du client *
+                </label>
+                <input
+                  type="email"
+                  value={formData.clientEmail}
+                  onChange={(e) => setFormData(prev => ({ ...prev, clientEmail: e.target.value }))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  placeholder="email@exemple.com"
+                  required
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Titre */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Titre du ticket *
+          </label>
+          <input
+            type="text"
+            value={formData.title}
+            onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+            placeholder="Résumé du problème"
+            required
+          />
+        </div>
+
+        {/* Description */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Description *
+          </label>
+          <textarea
+            value={formData.description}
+            onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+            rows={4}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none"
+            placeholder="Décrivez le problème en détail..."
+            required
+          />
+        </div>
+
+        {/* Priorité et Assignation */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Priorité
+            </label>
+            <div className="relative">
+              <select
+                value={formData.priority}
+                onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value as 'low' | 'medium' | 'high' }))}
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors appearance-none ${getPriorityColor(formData.priority)}`}
+              >
+                <option value="low">Faible</option>
+                <option value="medium">Moyenne</option>
+                <option value="high">Élevée</option>
+              </select>
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                {getPriorityIcon(formData.priority)}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Assigner à
+            </label>
+            <select
+              value={formData.assignedTo}
+              onChange={(e) => setFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+            >
+              <option value="">Non assigné</option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.email}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Bouton de soumission */}
+        <div className="flex justify-end pt-4">
+          <button
+            type="submit"
+            disabled={createLoading}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {createLoading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Création...
+              </>
+            ) : (
+              <>
+                <Send className="w-4 h-4" />
+                Créer le ticket
+              </>
+            )}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
