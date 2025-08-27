@@ -26,6 +26,8 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
     assignedTo: '',
     subscriberId: '',
     installerId: '',
+    clientName: '',
+    clientEmail: '',
   });
 
   const [isManualEntry, setIsManualEntry] = useState(false);
@@ -93,6 +95,8 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
         assignedTo: '',
         subscriberId: '',
         installerId: '',
+        clientName: '',
+        clientEmail: '',
       });
       setSelectedSubscriber('');
       setIsManualEntry(false);
@@ -142,185 +146,173 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
         </div>
 
         <div className="p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <h3 className="text-lg font-medium text-gray-900">Informations du ticket</h3>
-      </div>
+          <div className="flex items-center gap-3 mb-6">
+            <h3 className="text-lg font-medium text-gray-900">Informations du ticket</h3>
+          </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Sélection du client */}
-        <div className="space-y-4">
-          <label className="block text-sm font-medium text-gray-700">
-            Abonné *
-          </label>
-          
-          {isAirtableAvailable ? (
-            <div className="space-y-3">
-              <select
-                value={selectedSubscriber || (isManualEntry ? 'manual' : '')}
-                onChange={(e) => handleSubscriberChange(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-                required={!isManualEntry}
-              >
-                <option value="">Sélectionner un abonné</option>
-                {subscribers.map((subscriber) => (
-                  <option key={subscriber.id} value={subscriber.id}>
-                    {subscriber.prenom} {subscriber.nom} - {subscriber.contratAbonne}
-                  </option>
-                ))}
-                <option value="manual">➕ Saisie manuelle</option>
-              </select>
-            </div>
-          ) : (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <div className="flex items-center gap-2 text-yellow-800 mb-2">
-                <AlertCircle className="w-4 h-4" />
-                <span className="font-medium">Mode saisie manuelle</span>
-              </div>
-              <p className="text-sm text-yellow-700">
-                Saisissez manuellement les informations de l'abonné
-              </p>
-            </div>
-          )}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Sélection du client */}
+            <div className="space-y-4">
+              <label className="block text-sm font-medium text-gray-700">
+                Client *
+              </label>
+              
+              {isAirtableAvailable ? (
+                <div className="space-y-3">
+                  <select
+                    value={selectedSubscriber || (isManualEntry ? 'manual' : '')}
+                    onChange={(e) => handleSubscriberChange(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                    required={!isManualEntry}
+                  >
+                    <option value="">Sélectionner un client</option>
+                    {subscribers.map((subscriber) => (
+                      <option key={subscriber.id} value={subscriber.id}>
+                        {subscriber.name} - {subscriber.email}
+                      </option>
+                    ))}
+                    <option value="manual">➕ Saisie manuelle</option>
+                  </select>
+                </div>
+              ) : (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-yellow-800 mb-2">
+                    <AlertCircle className="w-4 h-4" />
+                    <span className="font-medium">Mode saisie manuelle</span>
+                  </div>
+                  <p className="text-sm text-yellow-700">
+                    Saisissez manuellement les informations du client
+                  </p>
+                </div>
+              )}
 
-          {/* Saisie manuelle ou Airtable non disponible */}
-          {(isManualEntry || !isAirtableAvailable) && (
-            <div className="mt-4">
+              {/* Saisie manuelle ou Airtable non disponible */}
+              {(isManualEntry || !isAirtableAvailable) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <User className="w-4 h-4 inline mr-1" />
+                      Nom du client *
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.clientName}
+                      onChange={(e) => setFormData(prev => ({ ...prev, clientName: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                      placeholder="Nom complet du client"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <Mail className="w-4 h-4 inline mr-1" />
+                      Email du client *
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.clientEmail}
+                      onChange={(e) => setFormData(prev => ({ ...prev, clientEmail: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                      placeholder="email@exemple.com"
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Titre */}
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                <User className="w-4 h-4 inline mr-1" />
-                Informations de l'abonné *
+                Titre du ticket *
               </label>
               <input
                 type="text"
-                value={formData.subscriberId}
-                onChange={(e) => setFormData(prev => ({ ...prev, subscriberId: e.target.value }))}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-                placeholder="Nom Prénom - Contrat ou Email"
+                value={formData.title}
+                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                placeholder="Résumé du problème"
                 required
               />
-              <p className="text-xs text-gray-500 mt-1">
-                Exemple: "Jean Dupont - SL-000123" ou "jean.dupont@email.com"
-              </p>
             </div>
-          )}
-        </div>
 
-        {/* Titre */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Titre du ticket *
-          </label>
-          <input
-            type="text"
-            value={formData.title}
-            onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-            placeholder="Résumé du problème"
-            required
-          />
-        </div>
+            {/* Description */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Description *
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                rows={4}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none"
+                placeholder="Décrivez le problème en détail..."
+                required
+              />
+            </div>
 
-        {/* Description */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Description *
-          </label>
-          <textarea
-            value={formData.description}
-            onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-            rows={4}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors resize-none"
-            placeholder="Décrivez le problème en détail..."
-            required
-          />
-        </div>
+            {/* Priorité et Assignation */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Priorité
+                </label>
+                <div className="relative">
+                  <select
+                    value={formData.priority}
+                    onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value as 'Haute' | 'Moyenne' | 'Basse' }))}
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors appearance-none ${getPriorityColor(formData.priority)}`}
+                  >
+                    <option value="Basse">Faible</option>
+                    <option value="Moyenne">Moyenne</option>
+                    <option value="Haute">Élevée</option>
+                  </select>
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                    {getPriorityIcon(formData.priority)}
+                  </div>
+                </div>
+              </div>
 
-        {/* Priorité et Assignation */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Priorité
-            </label>
-            <div className="relative">
-              <select
-                value={formData.priority}
-                onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value as any }))}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors appearance-none ${getPriorityColor(formData.priority)}`}
-              >
-                <option value="Basse">Basse</option>
-                <option value="Moyenne">Moyenne</option>
-                <option value="Haute">Haute</option>
-              </select>
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                {getPriorityIcon(formData.priority)}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Assigner à
+                </label>
+                <select
+                  value={formData.assignedTo}
+                  onChange={(e) => setFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                >
+                  <option value="">Non assigné</option>
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.email}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Type
-            </label>
-            <select
-              value={formData.type}
-              onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as any }))}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-            >
-              <option value="SAV / question technique">SAV / question technique</option>
-              <option value="Recouvrement">Recouvrement</option>
-              <option value="Plainte Installateur">Plainte Installateur</option>
-              <option value="changement date prélèvement/RIB">changement date prélèvement/RIB</option>
-              <option value="Résiliation anticipée / cession de contrat">Résiliation anticipée / cession de contrat</option>
-              <option value="Ajout contrat / Flexibilité">Ajout contrat / Flexibilité</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Assigner à
-            </label>
-            <select
-              value={formData.assignedTo}
-              onChange={(e) => setFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-            >
-              <option value="">Non assigné</option>
-              {users.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Bouton de soumission */}
-        <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-6 py-3 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
-          >
-            Annuler
-          </button>
-          <button
-            type="submit"
-            disabled={createLoading}
-            className="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {createLoading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Création...
-              </>
-            ) : (
-              <>
-                <Send className="w-4 h-4" />
-                Créer le ticket
-              </>
-            )}
-          </button>
-        </div>
-      </form>
+            {/* Bouton de soumission */}
+            <div className="flex justify-end pt-4">
+              <button
+                type="submit"
+                disabled={createLoading}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {createLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Création...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    Créer le ticket
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
