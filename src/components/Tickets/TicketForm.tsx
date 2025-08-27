@@ -13,7 +13,7 @@ interface TicketFormProps {
 
 const TicketForm: React.FC<TicketFormProps> = ({ ticket, onClose, onSuccess }) => {
   const { createTicket, updateTicket } = useTickets();
-  const { subscribers, loadData } = useAirtable();
+  const { subscribers, loading: airtableLoading, error: airtableError, initialized, loadData } = useAirtable();
   const { users: employees } = useSupabaseUsers();
   
   const [formData, setFormData] = useState({
@@ -34,24 +34,35 @@ const TicketForm: React.FC<TicketFormProps> = ({ ticket, onClose, onSuccess }) =
   const [subscriberSearch, setSubscriberSearch] = useState(ticket?.subscriberId || '');
   const [showSubscriberDropdown, setShowSubscriberDropdown] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     console.log('TicketForm: Chargement des abonnés...');
-    if (loadData) {
+    try {
       loadData();
+    } catch (error) {
+      console.error('Erreur lors du chargement initial:', error);
     }
   }, []);
 
-  useEffect(() => {
-    console.log('TicketForm: Données mises à jour');
-    console.log('Abonnés Airtable:', subscribers.length);
-    console.log('Employés Supabase:', employees.length);
-    console.log('Loading:', loading);
-    console.log('Error:', error);
-  }, [subscribers, employees]);
+  // Afficher un écran de chargement si les données ne sont pas encore initialisées
+  if (!initialized) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-xl shadow-xl p-8 text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Initialisation du formulaire...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (isSubmitting) {
+      return; // Éviter les soumissions multiples
+    }
     
     // Validation
     const newErrors: Record<string, string> = {};
@@ -64,7 +75,9 @@ const TicketForm: React.FC<TicketFormProps> = ({ ticket, onClose, onSuccess }) =
       return;
     }
 
-    // Créer le ticket
+    setIsSubmitting(true);
+    
+    // Créer ou modifier le ticket
     try {
       // Préparer les données avec le nom de l'abonné
       const ticketDataWithSubscriberName = {
@@ -78,9 +91,11 @@ const TicketForm: React.FC<TicketFormProps> = ({ ticket, onClose, onSuccess }) =
       if (ticket) {
         // Mode édition
         updateTicket(ticket.id, ticketDataForUpdate);
+        console.log('✅ Ticket modifié avec succès');
       } else {
         // Mode création
         createTicket(ticketDataForUpdate);
+        console.log('✅ Ticket créé avec succès');
         
         // TODO: Gérer l'upload des pièces jointes après création du ticket
         if (attachments.length > 0) {
@@ -93,6 +108,8 @@ const TicketForm: React.FC<TicketFormProps> = ({ ticket, onClose, onSuccess }) =
     } catch (error) {
       console.error('Erreur lors de la sauvegarde du ticket:', error);
       setErrors({ general: 'Erreur lors de la sauvegarde du ticket' });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -309,8 +326,8 @@ const TicketForm: React.FC<TicketFormProps> = ({ ticket, onClose, onSuccess }) =
                       onChange={(e) => handleSubscriberSearchChange(e.target.value)}
                       onFocus={() => setShowSubscriberDropdown(true)}
                       placeholder={
-                        loading ? 'Chargement des clients...' : 
-                        error ? 'Erreur de chargement - Saisie manuelle possible' :
+                        airtableLoading ? 'Chargement des clients...' : 
+                        airtableError ? 'Erreur de chargement - Saisie manuelle possible' :
                         subscribers.length === 0 ? 'Aucun client trouvé - Saisie manuelle possible' : 
                         'Rechercher par nom, prénom ou contrat...'
                       }
@@ -323,12 +340,12 @@ const TicketForm: React.FC<TicketFormProps> = ({ ticket, onClose, onSuccess }) =
                   {/* Dropdown des résultats */}
                   {showSubscriberDropdown && (
                     <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                      {loading ? (
+                      {airtableLoading ? (
                         <div className="px-4 py-3 text-center">
                           <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-orange-500 mx-auto mb-2"></div>
                           <div className="text-sm text-gray-600">Chargement des clients Airtable...</div>
                         </div>
-                      ) : error ? (
+                      ) : airtableError ? (
                         <div className="px-4 py-3 text-center">
                           <div className="text-sm text-red-600 mb-2">❌ Erreur de chargement</div>
                           <div className="text-xs text-gray-500">
@@ -380,9 +397,9 @@ const TicketForm: React.FC<TicketFormProps> = ({ ticket, onClose, onSuccess }) =
                 </div>
                 
                 {/* Informations de debug pour l'administrateur */}
-                {error && (
+               {airtableError && (
                   <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
-                    <strong>Erreur Airtable :</strong> {error}
+                    <strong>Erreur Airtable :</strong> {airtableError}
                   </div>
                 )}
                 
@@ -483,10 +500,20 @@ const TicketForm: React.FC<TicketFormProps> = ({ ticket, onClose, onSuccess }) =
             </button>
             <button
               type="submit"
+              disabled={isSubmitting}
               className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors flex items-center"
             >
-              <Save className="w-4 h-4 mr-2" />
-              {ticket ? 'Modifier le Ticket' : 'Créer le Ticket'}
+              {isSubmitting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  {ticket ? 'Modification...' : 'Création...'}
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  {ticket ? 'Modifier le Ticket' : 'Créer le Ticket'}
+                </>
+              )}
             </button>
           </div>
         </form>
