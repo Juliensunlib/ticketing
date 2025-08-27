@@ -37,6 +37,7 @@ export const useAirtable = () => {
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
+    const config = getAirtableConfig();
     
     const loadDataWithService = async (service: AirtableService) => {
       console.log('✅ Configuration Airtable trouvée, chargement des données...');
@@ -80,6 +81,7 @@ export const useAirtable = () => {
         setInitialized(true);
       });
     } else {
+      const timeout = setTimeout(() => {
         console.error('❌ Configuration Airtable invalide ou manquante');
         setInitialized(true);
       }, 5000); // 5 secondes maximum
