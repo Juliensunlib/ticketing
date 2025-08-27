@@ -47,24 +47,6 @@ export const useAirtable = () => {
   const [error, setError] = useState<string | null>(globalError);
   const [initialized, setInitialized] = useState(globalInitialized);
 
-  // Synchroniser avec l'état global quand il change
-  useEffect(() => {
-    const syncWithGlobal = () => {
-      setSubscribers(globalSubscribers);
-      setLoading(globalLoading);
-      setError(globalError);
-      setInitialized(globalInitialized);
-    };
-
-    // Synchroniser immédiatement
-    syncWithGlobal();
-
-    // Vérifier périodiquement les changements (pour les composants qui se montent après)
-    const interval = setInterval(syncWithGlobal, 1000);
-
-    return () => clearInterval(interval);
-  }, []);
-
   useEffect(() => {
     // Si déjà initialisé globalement, utiliser les données en cache
     if (globalInitialized) {
@@ -120,20 +102,32 @@ export const useAirtable = () => {
       
       // Mettre à jour le cache global
       globalSubscribers = subscribersData;
-      setSubscribers(subscribersData);
       globalError = null;
+      globalInitialized = true;
+      globalLoading = false;
+      
+      // Mettre à jour l'état local
+      setSubscribers(subscribersData);
+      setError(null);
+      setLoading(false);
+      setInitialized(true);
     } catch (err) {
       console.error('❌ Erreur Airtable:', err);
       const errorMessage = `Erreur de chargement Airtable: ${err instanceof Error ? err.message : 'Erreur inconnue'}`;
       globalError = errorMessage;
       globalSubscribers = [];
+      globalInitialized = true;
+      globalLoading = false;
+      
+      // Mettre à jour l'état local
       setError(errorMessage);
       setSubscribers([]);
-    } finally {
-      globalLoading = false;
-      globalInitialized = true;
       setLoading(false);
       setInitialized(true);
+    } finally {
+      // S'assurer que les états globaux sont mis à jour
+      globalLoading = false;
+      globalInitialized = true;
     }
   };
 
