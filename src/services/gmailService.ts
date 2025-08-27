@@ -262,9 +262,9 @@ class GmailService {
 
       console.log(`📬 ${listResponse.messages.length} emails trouvés`);
 
-      // Récupérer les détails de chaque message (limité à 20 pour les performances)
+      // Récupérer les détails de chaque message (tous les messages récupérés)
       const messages = await Promise.all(
-        listResponse.messages.slice(0, 20).map(async (msg) => {
+        listResponse.messages.map(async (msg) => {
           try {
             const messageDetail: GmailMessage = await this.makeGmailRequest(`messages/${msg.id}`);
             return this.parseMessage(messageDetail);

@@ -163,7 +163,7 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
 
     try {
       console.log('📧 Chargement des emails depuis Gmail...');
-      const gmailEmails = await gmailService.getMessages(50);
+      const gmailEmails = await gmailService.getMessages(100); // Augmenter la limite
       
       console.log(`✅ ${gmailEmails.length} emails chargés`);
       setEmails(gmailEmails);
