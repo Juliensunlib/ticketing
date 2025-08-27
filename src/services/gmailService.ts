@@ -376,6 +376,7 @@ class GmailService {
     try {
       console.log('🗑️ Suppression de l\'email:', messageId);
       
+      await this.makeGmailRequest(`messages/${messageId}/trash`, 'POST');
       await this.makeGmailRequest(`messages/${messageId}`, 'DELETE');
       
       console.log('✅ Email supprimé avec succès de Gmail');
