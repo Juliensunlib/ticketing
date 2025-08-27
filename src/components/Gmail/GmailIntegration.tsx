@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Plus, Search, RefreshCw, Calendar, User, Paperclip, ExternalLink, Key, CheckCircle, AlertCircle, Send, X, Inbox, Archive, FileText } from 'lucide-react';
+import { Mail, Plus, Search, RefreshCw, Calendar, User, Paperclip, ExternalLink, Key, CheckCircle, AlertCircle, Send, X, Inbox, Archive, FileText, Link } from 'lucide-react';
 import gmailService from '../../services/gmailService';
 import { useTickets } from '../../hooks/useTickets';
 
@@ -32,6 +32,9 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
   const [replyContent, setReplyContent] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
   const { tickets } = useTickets();
+  const [showAttachToTicket, setShowAttachToTicket] = useState(false);
+  const [selectedEmailForAttach, setSelectedEmailForAttach] = useState<Email | null>(null);
+  const [ticketSearchTerm, setTicketSearchTerm] = useState('');
 
   // Charger les emails traités depuis le localStorage
   useEffect(() => {
@@ -224,6 +227,52 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
       if (selectedEmail?.id === emailId) {
         setSelectedEmail(null);
       }
+    }
+  };
+
+  const handleAttachToExistingTicket = (email: Email) => {
+    setSelectedEmailForAttach(email);
+    setShowAttachToTicket(true);
+    setTicketSearchTerm('');
+  };
+
+  const filteredTicketsForAttach = tickets.filter(ticket => {
+    const searchLower = ticketSearchTerm.toLowerCase();
+    return (
+      ticket.subscriberId.toLowerCase().includes(searchLower) ||
+      ticket.title.toLowerCase().includes(searchLower) ||
+      ticket.id.toLowerCase().includes(searchLower)
+    );
+  });
+
+  const attachEmailToTicket = async (ticketId: string) => {
+    if (!selectedEmailForAttach) return;
+
+    try {
+      const { addComment } = useTickets();
+      const emailContent = `📧 Email attaché depuis la boîte de réception :
+
+De: ${selectedEmailForAttach.from}
+Date: ${new Date(selectedEmailForAttach.date).toLocaleString('fr-FR')}
+Sujet: ${selectedEmailForAttach.subject}
+
+${selectedEmailForAttach.body || selectedEmailForAttach.snippet}`;
+
+      await addComment(ticketId, emailContent);
+      
+      // Marquer l'email comme traité
+      const newProcessedEmails = new Set(processedEmails);
+      newProcessedEmails.add(selectedEmailForAttach.id);
+      setProcessedEmails(newProcessedEmails);
+      saveProcessedEmails(newProcessedEmails);
+      
+      setShowAttachToTicket(false);
+      setSelectedEmailForAttach(null);
+      alert('Email attaché au ticket avec succès !');
+      
+    } catch (error) {
+      console.error('Erreur lors de l\'attachement:', error);
+      alert('Erreur lors de l\'attachement de l\'email au ticket');
     }
   };
 
@@ -652,6 +701,17 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
+                            handleAttachToExistingTicket(email);
+                          }}
+                          className="text-xs px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded transition-colors flex items-center"
+                          title="Attacher à un ticket existant"
+                        >
+                          <Link className="w-3 h-3 mr-1" />
+                          Attacher
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
                             handleDeleteEmail(email.id, email.subject);
                           }}
                           className="text-xs px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded transition-colors flex items-center"
@@ -815,6 +875,14 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
                     Créer un ticket
                   </button>
                   <button
+                    onClick={() => handleAttachToExistingTicket(selectedEmail)}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center"
+                    title="Attacher à un ticket existant"
+                  >
+                    <Link className="w-4 h-4 mr-2" />
+                    Attacher
+                  </button>
+                  <button
                     onClick={() => handleDeleteEmail(selectedEmail.id, selectedEmail.subject)}
                     className="px-4 py-2 border border-red-300 hover:bg-red-50 text-red-700 rounded-lg transition-colors flex items-center"
                     title="Supprimer cet email"
@@ -884,6 +952,117 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
           )}
         </div>
       </div>
+
+      {/* Modal d'attachement à un ticket existant */}
+      {showAttachToTicket && selectedEmailForAttach && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+                  <Link className="w-5 h-5 mr-2 text-blue-500" />
+                  Attacher l'email à un ticket existant
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowAttachToTicket(false);
+                    setSelectedEmailForAttach(null);
+                  }}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              {/* Informations de l'email */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <h3 className="text-sm font-medium text-blue-900 mb-2">Email à attacher :</h3>
+                <div className="space-y-1 text-sm text-blue-800">
+                  <div><strong>De:</strong> {selectedEmailForAttach.from}</div>
+                  <div><strong>Sujet:</strong> {selectedEmailForAttach.subject}</div>
+                  <div><strong>Date:</strong> {new Date(selectedEmailForAttach.date).toLocaleString('fr-FR')}</div>
+                </div>
+              </div>
+
+              {/* Recherche de tickets */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Rechercher un ticket (nom du client ou titre du ticket) :
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    type="text"
+                    value={ticketSearchTerm}
+                    onChange={(e) => setTicketSearchTerm(e.target.value)}
+                    placeholder="Tapez le nom du client ou le titre du ticket..."
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Liste des tickets filtrés */}
+              <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg">
+                {ticketSearchTerm.length > 0 ? (
+                  filteredTicketsForAttach.length > 0 ? (
+                    <div className="divide-y divide-gray-200">
+                      {filteredTicketsForAttach.slice(0, 10).map((ticket) => (
+                        <div
+                          key={ticket.id}
+                          className="p-4 hover:bg-gray-50 cursor-pointer transition-colors"
+                          onClick={() => attachEmailToTicket(ticket.id)}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h4 className="text-sm font-medium text-gray-900 mb-1">
+                                #{ticket.id} - {ticket.title}
+                              </h4>
+                              <p className="text-xs text-gray-600 mb-2">
+                                Client: {ticket.subscriberId}
+                              </p>
+                              <div className="flex items-center space-x-2">
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                  ticket.status === 'Fermé' 
+                                    ? 'bg-gray-100 text-gray-800'
+                                    : 'bg-blue-100 text-blue-800'
+                                }`}>
+                                  {ticket.status}
+                                </span>
+                                <span className="text-xs text-gray-500">
+                                  {new Date(ticket.createdAt).toLocaleDateString('fr-FR')}
+                                </span>
+                              </div>
+                            </div>
+                            <button className="ml-4 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors">
+                              Attacher
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center">
+                      <Search className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-600 text-sm">
+                        Aucun ticket trouvé pour "{ticketSearchTerm}"
+                      </p>
+                    </div>
+                  )
+                ) : (
+                  <div className="p-8 text-center">
+                    <Search className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-gray-600 text-sm">
+                      Tapez pour rechercher un ticket par nom de client ou titre
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
