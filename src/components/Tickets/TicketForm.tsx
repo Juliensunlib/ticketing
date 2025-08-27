@@ -54,15 +54,35 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
   useEffect(() => {
     const handleAirtableUpdate = (event: CustomEvent) => {
       console.log('🔄 TicketForm: Mise à jour Airtable reçue:', event.detail);
-      // Forcer un re-render en mettant à jour un état local
+      
+      // Forcer la mise à jour des états avec les données globales
+      const { subscribers: newSubscribers, count, initialized, error } = event.detail;
+      console.log('🔄 TicketForm: Application des nouvelles données:', {
+        newCount: count,
+        currentCount: subscribers.length,
+        newInitialized: initialized,
+        currentInitialized: initialized
+      });
+      
+      // Déclencher un re-render complet du composant
       setFormData(prev => ({ ...prev }));
+      
+      // Forcer une nouvelle évaluation de isAirtableAvailable
+      setTimeout(() => {
+        console.log('🔍 TicketForm: Vérification post-mise à jour:', {
+          subscribersLength: subscribers.length,
+          initialized,
+          hasError: !!airtableError,
+          isAvailable: initialized && subscribers.length > 0 && !airtableError
+        });
+      }, 100);
     };
 
     window.addEventListener('airtable-data-updated', handleAirtableUpdate as EventListener);
     return () => {
       window.removeEventListener('airtable-data-updated', handleAirtableUpdate as EventListener);
     };
-  }, []);
+  }, [subscribers.length, initialized, airtableError]);
 
   // Filtrer les abonnés selon le terme de recherche
   useEffect(() => {
