@@ -42,8 +42,15 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
   // Essayer de détecter automatiquement l'abonné depuis l'email
   useEffect(() => {
     const detectSubscriber = () => {
+      console.log('🔍 === DÉTECTION ABONNÉ DEPUIS EMAIL ===');
+      console.log('🔍 Email from:', email.from);
+      console.log('🔍 Nombre d\'abonnés disponibles:', subscribers.length);
+      
       const emailAddress = email.from.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/)?.[1];
       const fromName = email.from.replace(/<.*>/, '').trim();
+      
+      console.log('🔍 Email extrait:', emailAddress);
+      console.log('🔍 Nom extrait:', fromName);
       
       if (emailAddress) {
         // Chercher par email
@@ -52,6 +59,7 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
         );
         
         if (subscriberByEmail) {
+          console.log('✅ Abonné trouvé par email:', subscriberByEmail);
           setFormData(prev => ({
             ...prev,
             subscriberId: `${subscriberByEmail.prenom} ${subscriberByEmail.nom} - ${subscriberByEmail.contratAbonne}`
@@ -68,6 +76,7 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
         });
         
         if (subscriberByName) {
+          console.log('✅ Abonné trouvé par nom:', subscriberByName);
           setFormData(prev => ({
             ...prev,
             subscriberId: `${subscriberByName.prenom} ${subscriberByName.nom} - ${subscriberByName.contratAbonne}`
@@ -77,10 +86,12 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
       }
       
       // Si aucun abonné trouvé, utiliser l'email comme identifiant
+      console.log('❌ Aucun abonné trouvé, utilisation de l\'email');
       setFormData(prev => ({
         ...prev,
         subscriberId: `Autre - ${email.from}`
       }));
+      console.log('🔍 === FIN DÉTECTION ===');
     };
 
     if (subscribers.length > 0) {
@@ -152,17 +163,62 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Abonné *
             </label>
-            <input
-              type="text"
-              value={formData.subscriberId}
-              onChange={(e) => setFormData(prev => ({ ...prev, subscriberId: e.target.value }))}
-              placeholder="Nom de l'abonné ou contrat"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-              required
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Détecté automatiquement depuis l'email ou modifiez si nécessaire
-            </p>
+            
+            {subscribers.length > 0 ? (
+              <div className="space-y-3">
+                <select
+                  value={subscribers.find(s => formData.subscriberId.includes(s.contratAbonne))?.id || 'manual'}
+                  onChange={(e) => {
+                    if (e.target.value === 'manual') {
+                      // Garder la valeur actuelle pour saisie manuelle
+                    } else {
+                      const subscriber = subscribers.find(s => s.id === e.target.value);
+                      if (subscriber) {
+                        setFormData(prev => ({
+                          ...prev,
+                          subscriberId: `${subscriber.prenom} ${subscriber.nom} - ${subscriber.contratAbonne}`
+                        }));
+                      }
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                >
+                  <option value="manual">✏️ Saisie manuelle (actuel: {formData.subscriberId})</option>
+                  {subscribers.map((subscriber) => (
+                    <option key={subscriber.id} value={subscriber.id}>
+                      {subscriber.prenom} {subscriber.nom} - {subscriber.contratAbonne}
+                      {subscriber.email && ` (${subscriber.email})`}
+                    </option>
+                  ))}
+                </select>
+                
+                <input
+                  type="text"
+                  value={formData.subscriberId}
+                  onChange={(e) => setFormData(prev => ({ ...prev, subscriberId: e.target.value }))}
+                  placeholder="Nom de l'abonné ou contrat"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  required
+                />
+                <p className="text-xs text-gray-500">
+                  Sélectionnez dans la liste ou modifiez manuellement
+                </p>
+              </div>
+            ) : (
+              <div>
+                <input
+                  type="text"
+                  value={formData.subscriberId}
+                  onChange={(e) => setFormData(prev => ({ ...prev, subscriberId: e.target.value }))}
+                  placeholder="Nom de l'abonné ou contrat"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Détecté automatiquement depuis l'email ou modifiez si nécessaire
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Description */}

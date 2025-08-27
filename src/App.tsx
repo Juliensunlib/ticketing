@@ -34,17 +34,19 @@ const AppContent: React.FC = () => {
 
   const handleViewChange = (view: string) => {
     setActiveView(view);
-    if (view === 'create') {
-      setShowTicketForm(true);
-    }
+    setShowTicketForm(false);
+    setShowEmailTicketForm(false);
+    setSelectedEmail(null);
+    setSelectedTicket(null);
+    setEditingTicket(null);
   };
 
   const handleTicketFormClose = () => {
     setShowTicketForm(false);
-    setActiveView('dashboard');
   };
 
   const handleTicketFormSuccess = () => {
+    setShowTicketForm(false);
     // Optionnel : afficher une notification de succès
     console.log('Ticket créé avec succès !');
   };
@@ -101,6 +103,18 @@ const AppContent: React.FC = () => {
     switch (activeView) {
       case 'dashboard':
         return <Dashboard />;
+      case 'create':
+        return (
+          <div className="p-6">
+            <TicketForm
+              onClose={() => setActiveView('dashboard')}
+              onSuccess={() => {
+                setActiveView('tickets');
+                console.log('Ticket créé avec succès !');
+              }}
+            />
+          </div>
+        );
       case 'tickets':
         return <TicketList onViewTicket={handleViewTicket} onEditTicket={handleEditTicket} />;
       case 'emails':
@@ -149,13 +163,6 @@ const AppContent: React.FC = () => {
       </div>
 
       {/* Modales */}
-      {showTicketForm && (
-        <TicketForm
-          onClose={handleTicketFormClose}
-          onSuccess={handleTicketFormSuccess}
-        />
-      )}
-
       {selectedTicket && (
         <TicketDetail
           ticket={selectedTicket}

@@ -1,25 +1,31 @@
 import React, { useState, useEffect } from 'react';
+import { X } from 'lucide-react';
 import { useAirtable } from '../../hooks/useAirtable';
-import { useSupabaseTickets } from '../../hooks/useSupabaseTickets';
+import { useTickets } from '../../hooks/useTickets';
 import { useSupabaseUsers } from '../../hooks/useSupabaseUsers';
 import { Send, User, Mail, AlertCircle, Clock, Flag } from 'lucide-react';
 
 interface TicketFormProps {
-  onTicketCreated?: () => void;
+  onClose: () => void;
+  onSuccess: () => void;
 }
 
-export default function TicketForm({ onTicketCreated }: TicketFormProps) {
+const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
   const { subscribers, loading: airtableLoading, error: airtableError, initialized } = useAirtable();
-  const { createTicket, loading: createLoading } = useSupabaseTickets();
+  const { createTicket, loading: createLoading } = useTickets();
   const { users } = useSupabaseUsers();
 
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    priority: 'medium' as 'low' | 'medium' | 'high',
-    clientName: '',
-    clientEmail: '',
+    priority: 'Moyenne' as 'Haute' | 'Moyenne' | 'Basse',
+    status: 'Nouveau' as const,
+    type: 'SAV / question technique' as const,
+    origin: 'SunLib' as const,
+    channel: 'Formulaire de contact' as const,
     assignedTo: '',
+    subscriberId: '',
+    installerId: '',
   });
 
   const [isManualEntry, setIsManualEntry] = useState(false);
@@ -39,7 +45,7 @@ export default function TicketForm({ onTicketCreated }: TicketFormProps) {
     if (value === 'manual') {
       setIsManualEntry(true);
       setSelectedSubscriber('');
-      setFormData(prev => ({ ...prev, clientName: '', clientEmail: '' }));
+      setFormData(prev => ({ ...prev, subscriberId: '' }));
     } else {
       setIsManualEntry(false);
       setSelectedSubscriber(value);
@@ -48,8 +54,7 @@ export default function TicketForm({ onTicketCreated }: TicketFormProps) {
       if (subscriber) {
         setFormData(prev => ({
           ...prev,
-          clientName: subscriber.name,
-          clientEmail: subscriber.email
+          subscriberId: `${subscriber.prenom} ${subscriber.nom} - ${subscriber.contratAbonne}`
         }));
       }
     }
@@ -63,82 +68,89 @@ export default function TicketForm({ onTicketCreated }: TicketFormProps) {
       return;
     }
 
-    if (!isManualEntry && !selectedSubscriber) {
-      alert('Veuillez sélectionner un client');
+    if (!isManualEntry && !selectedSubscriber && isAirtableAvailable) {
+      alert('Veuillez sélectionner un abonné');
       return;
     }
 
-    if (isManualEntry && (!formData.clientName.trim() || !formData.clientEmail.trim())) {
-      alert('Veuillez remplir le nom et l\'email du client');
+    if ((isManualEntry || !isAirtableAvailable) && !formData.subscriberId.trim()) {
+      alert('Veuillez remplir les informations de l\'abonné');
       return;
     }
 
     try {
-      await createTicket({
-        title: formData.title,
-        description: formData.description,
-        priority: formData.priority,
-        client_name: formData.clientName,
-        client_email: formData.clientEmail,
-        assigned_to: formData.assignedTo || null,
-        status: 'open'
-      });
+      await createTicket(formData);
 
       // Réinitialiser le formulaire
       setFormData({
         title: '',
         description: '',
-        priority: 'medium',
-        clientName: '',
-        clientEmail: '',
+        priority: 'Moyenne',
+        status: 'Nouveau',
+        type: 'SAV / question technique',
+        origin: 'SunLib',
+        channel: 'Formulaire de contact',
         assignedTo: '',
+        subscriberId: '',
+        installerId: '',
       });
       setSelectedSubscriber('');
       setIsManualEntry(false);
 
-      if (onTicketCreated) {
-        onTicketCreated();
-      }
-
+      onSuccess();
       alert('Ticket créé avec succès !');
     } catch (error) {
       console.error('Erreur lors de la création du ticket:', error);
-      alert('Erreur lors de la création du ticket');
+      alert(`Erreur lors de la création du ticket: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
     }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high': return 'text-red-600 bg-red-50 border-red-200';
-      case 'medium': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-      case 'low': return 'text-green-600 bg-green-50 border-green-200';
+      case 'Haute': return 'text-red-600 bg-red-50 border-red-200';
+      case 'Moyenne': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+      case 'Basse': return 'text-green-600 bg-green-50 border-green-200';
       default: return 'text-gray-600 bg-gray-50 border-gray-200';
     }
   };
 
   const getPriorityIcon = (priority: string) => {
     switch (priority) {
-      case 'high': return <AlertCircle className="w-4 h-4" />;
-      case 'medium': return <Clock className="w-4 h-4" />;
-      case 'low': return <Flag className="w-4 h-4" />;
+      case 'Haute': return <AlertCircle className="w-4 h-4" />;
+      case 'Moyenne': return <Clock className="w-4 h-4" />;
+      case 'Basse': return <Flag className="w-4 h-4" />;
       default: return <Flag className="w-4 h-4" />;
     }
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2 bg-blue-100 rounded-lg">
-          <Send className="w-5 h-5 text-blue-600" />
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+              <Send className="w-5 h-5 mr-2 text-orange-500" />
+              Nouveau Ticket
+            </h2>
+            <button
+              onClick={onClose}
+              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
-        <h2 className="text-xl font-semibold text-gray-900">Nouveau Ticket</h2>
+
+        <div className="p-6">
+      <div className="flex items-center gap-3 mb-6">
+        <h3 className="text-lg font-medium text-gray-900">Informations du ticket</h3>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Sélection du client */}
         <div className="space-y-4">
           <label className="block text-sm font-medium text-gray-700">
-            Client *
+            Abonné *
           </label>
           
           {isAirtableAvailable ? (
@@ -146,13 +158,13 @@ export default function TicketForm({ onTicketCreated }: TicketFormProps) {
               <select
                 value={selectedSubscriber || (isManualEntry ? 'manual' : '')}
                 onChange={(e) => handleSubscriberChange(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
                 required={!isManualEntry}
               >
-                <option value="">Sélectionner un client</option>
+                <option value="">Sélectionner un abonné</option>
                 {subscribers.map((subscriber) => (
                   <option key={subscriber.id} value={subscriber.id}>
-                    {subscriber.name} - {subscriber.email}
+                    {subscriber.prenom} {subscriber.nom} - {subscriber.contratAbonne}
                   </option>
                 ))}
                 <option value="manual">➕ Saisie manuelle</option>
@@ -165,42 +177,29 @@ export default function TicketForm({ onTicketCreated }: TicketFormProps) {
                 <span className="font-medium">Mode saisie manuelle</span>
               </div>
               <p className="text-sm text-yellow-700">
-                Saisissez manuellement les informations du client
+                Saisissez manuellement les informations de l'abonné
               </p>
             </div>
           )}
 
           {/* Saisie manuelle ou Airtable non disponible */}
           {(isManualEntry || !isAirtableAvailable) && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <User className="w-4 h-4 inline mr-1" />
-                  Nom du client *
-                </label>
-                <input
-                  type="text"
-                  value={formData.clientName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, clientName: e.target.value }))}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                  placeholder="Nom complet du client"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <Mail className="w-4 h-4 inline mr-1" />
-                  Email du client *
-                </label>
-                <input
-                  type="email"
-                  value={formData.clientEmail}
-                  onChange={(e) => setFormData(prev => ({ ...prev, clientEmail: e.target.value }))}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                  placeholder="email@exemple.com"
-                  required
-                />
-              </div>
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <User className="w-4 h-4 inline mr-1" />
+                Informations de l'abonné *
+              </label>
+              <input
+                type="text"
+                value={formData.subscriberId}
+                onChange={(e) => setFormData(prev => ({ ...prev, subscriberId: e.target.value }))}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                placeholder="Nom Prénom - Contrat ou Email"
+                required
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Exemple: "Jean Dupont - SL-000123" ou "jean.dupont@email.com"
+              </p>
             </div>
           )}
         </div>
@@ -214,7 +213,7 @@ export default function TicketForm({ onTicketCreated }: TicketFormProps) {
             type="text"
             value={formData.title}
             onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
             placeholder="Résumé du problème"
             required
           />
@@ -229,14 +228,14 @@ export default function TicketForm({ onTicketCreated }: TicketFormProps) {
             value={formData.description}
             onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
             rows={4}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors resize-none"
             placeholder="Décrivez le problème en détail..."
             required
           />
         </div>
 
         {/* Priorité et Assignation */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Priorité
@@ -244,12 +243,12 @@ export default function TicketForm({ onTicketCreated }: TicketFormProps) {
             <div className="relative">
               <select
                 value={formData.priority}
-                onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value as 'low' | 'medium' | 'high' }))}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors appearance-none ${getPriorityColor(formData.priority)}`}
+                onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value as any }))}
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors appearance-none ${getPriorityColor(formData.priority)}`}
               >
-                <option value="low">Faible</option>
-                <option value="medium">Moyenne</option>
-                <option value="high">Élevée</option>
+                <option value="Basse">Basse</option>
+                <option value="Moyenne">Moyenne</option>
+                <option value="Haute">Haute</option>
               </select>
               <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
                 {getPriorityIcon(formData.priority)}
@@ -259,17 +258,35 @@ export default function TicketForm({ onTicketCreated }: TicketFormProps) {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
+              Type
+            </label>
+            <select
+              value={formData.type}
+              onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as any }))}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+            >
+              <option value="SAV / question technique">SAV / question technique</option>
+              <option value="Recouvrement">Recouvrement</option>
+              <option value="Plainte Installateur">Plainte Installateur</option>
+              <option value="changement date prélèvement/RIB">changement date prélèvement/RIB</option>
+              <option value="Résiliation anticipée / cession de contrat">Résiliation anticipée / cession de contrat</option>
+              <option value="Ajout contrat / Flexibilité">Ajout contrat / Flexibilité</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               Assigner à
             </label>
             <select
               value={formData.assignedTo}
               onChange={(e) => setFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
             >
               <option value="">Non assigné</option>
               {users.map((user) => (
                 <option key={user.id} value={user.id}>
-                  {user.email}
+                  {user.name}
                 </option>
               ))}
             </select>
@@ -277,11 +294,18 @@ export default function TicketForm({ onTicketCreated }: TicketFormProps) {
         </div>
 
         {/* Bouton de soumission */}
-        <div className="flex justify-end pt-4">
+        <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-6 py-3 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+          >
+            Annuler
+          </button>
           <button
             type="submit"
             disabled={createLoading}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {createLoading ? (
               <>
@@ -297,6 +321,10 @@ export default function TicketForm({ onTicketCreated }: TicketFormProps) {
           </button>
         </div>
       </form>
+        </div>
+      </div>
     </div>
   );
-}
+};
+
+export default TicketForm;
