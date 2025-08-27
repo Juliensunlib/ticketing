@@ -7,16 +7,22 @@ const getAirtableConfig = () => {
   const apiKey = import.meta.env.VITE_AIRTABLE_API_KEY;
   const subscribersBaseId = import.meta.env.VITE_AIRTABLE_SUBSCRIBERS_BASE_ID;
 
-  console.log('🔍 Configuration Airtable:');
-  console.log('- API Key:', apiKey ? `${apiKey.substring(0, 8)}...` : 'MANQUANTE');
-  console.log('- Base ID:', subscribersBaseId || 'MANQUANTE');
+  // Logs uniquement en mode développement et si les variables sont définies
+  if (import.meta.env.DEV && (apiKey || subscribersBaseId)) {
+    console.log('🔍 Configuration Airtable:');
+    console.log('- API Key:', apiKey ? `${apiKey.substring(0, 8)}...` : 'MANQUANTE');
+    console.log('- Base ID:', subscribersBaseId || 'MANQUANTE');
+  }
 
   if (!apiKey || !subscribersBaseId || 
       apiKey === 'votre_clé_api_airtable' || 
       subscribersBaseId === 'id_de_votre_base_abonnés' ||
       apiKey.trim() === '' || 
       subscribersBaseId.trim() === '') {
-    console.warn('⚠️ Configuration Airtable incomplète. Vérifiez votre fichier .env');
+    // Ne pas afficher d'avertissement si on est en production (variables dans Vercel)
+    if (import.meta.env.DEV) {
+      console.info('ℹ️ Configuration Airtable locale non trouvée. Mode saisie manuelle activé.');
+    }
     return null;
   }
 
