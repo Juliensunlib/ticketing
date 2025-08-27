@@ -73,6 +73,7 @@ export const useAirtable = () => {
       if (!airtableServiceInstance) {
         console.log('✅ useAirtable: Création du service Airtable');
         airtableServiceInstance = new AirtableService(config.apiKey, config.subscribersBaseId);
+        setForceUpdate(prev => prev + 1);
       }
       
       // Charger les données une seule fois
