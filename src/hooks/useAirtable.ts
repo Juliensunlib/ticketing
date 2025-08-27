@@ -123,7 +123,12 @@ export const useAirtable = () => {
         console.log('🔄 useAirtable: Notification de mise à jour globale');
         // Déclencher un événement personnalisé pour notifier tous les composants
         window.dispatchEvent(new CustomEvent('airtable-data-updated', {
-          detail: { subscribers: subscribersData, count: subscribersData.length }
+          detail: { 
+            subscribers: subscribersData, 
+            count: subscribersData.length,
+            initialized: true,
+            error: null
+          }
         }));
       }, 100);
       
