@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Edit, MessageCircle, Paperclip, Clock, User, Building, Phone, Mail, Calendar, Tag, AlertCircle, ExternalLink, Send, Plus } from 'lucide-react';
+import { X, Edit, MessageCircle, Paperclip, Clock, User, Building, Phone, Mail, Calendar, Tag, AlertCircle, ExternalLink, Send, Plus, AtSign } from 'lucide-react';
 import { Ticket } from '../../types';
 import { useTickets } from '../../hooks/useTickets';
 import { useAuth } from '../../contexts/AuthContext';
@@ -270,6 +270,28 @@ Priorité: ${currentTicket.priority}`;
     currentTicket.subscriberId.includes(`${sub.prenom} ${sub.nom}`)
   );
 
+  // Fonction pour détecter si le ticket vient d'un email
+  const isFromEmail = () => {
+    return currentTicket.description.includes('Email reçu de:') || 
+           currentTicket.description.includes('De: ') ||
+           currentTicket.channel === 'Mail';
+  };
+
+  // Fonction pour extraire l'email depuis la description du ticket (si créé depuis email)
+  const getEmailFromDescription = () => {
+    if (!isFromEmail()) return null;
+    
+    // Chercher "Email reçu de: email@domain.com"
+    const emailMatch = currentTicket.description.match(/Email reçu de:\s*([^\s\n]+@[^\s\n]+)/);
+    if (emailMatch) return emailMatch[1];
+    
+    // Chercher "De: email@domain.com" ou "De: Nom <email@domain.com>"
+    const fromMatch = currentTicket.description.match(/De:\s*(?:[^<]*<)?([^\s<>\n]+@[^\s<>\n]+)/);
+    if (fromMatch) return fromMatch[1];
+    
+    return null;
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex">
@@ -388,6 +410,51 @@ Priorité: ${currentTicket.priority}`;
                       </a>
                     </div>
                   )}
+                  
+                  {/* Email du client */}
+                  {(subscriber?.email || getEmailFromDescription()) && (
+                    <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                      <span className="text-sm text-gray-600 flex items-center">
+                        <AtSign className="w-3 h-3 mr-1" />
+                        Email
+                      </span>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm font-medium text-gray-900">
+                          {subscriber?.email || getEmailFromDescription()}
+                        </span>
+                        <a
+                          href={`mailto:${subscriber?.email || getEmailFromDescription()}`}
+                          className="text-orange-600 hover:text-orange-700 transition-colors"
+                          title="Envoyer un email"
+                        >
+                          <Mail className="w-3 h-3" />
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Téléphone du client (uniquement si client Airtable) */}
+                  {subscriber?.telephone && !isFromEmail() && (
+                    <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                      <span className="text-sm text-gray-600 flex items-center">
+                        <Phone className="w-3 h-3 mr-1" />
+                        Téléphone
+                      </span>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm font-medium text-gray-900">
+                          {subscriber.telephone}
+                        </span>
+                        <a
+                          href={`tel:${subscriber.telephone}`}
+                          className="text-orange-600 hover:text-orange-700 transition-colors"
+                          title="Appeler"
+                        >
+                          <Phone className="w-3 h-3" />
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                  
                   {currentTicket.installerId && (
                     <div className="flex items-center justify-between py-2">
                       <span className="text-sm text-gray-600">Installateur</span>

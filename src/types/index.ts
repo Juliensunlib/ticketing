@@ -43,6 +43,7 @@ export interface Subscriber {
   installateur?: string;
   lienCRM?: string;
   email?: string;
+  telephone?: string;
 }
 
 export interface AirtableConfig {
