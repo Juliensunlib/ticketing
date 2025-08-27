@@ -28,8 +28,6 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose }) => {
     priority: ticket.priority,
     assignedTo: ticket.assignedTo || ''
   });
-  const [showEmailReply, setShowEmailReply] = useState(false);
-  const [sendingEmail, setSendingEmail] = useState(false);
 
   // Utiliser le ticket mis à jour depuis l'état global au lieu de la prop
   const currentTicket = tickets.find(t => t.id === ticket.id) || ticket;
@@ -416,6 +414,8 @@ Priorité: ${currentTicket.priority}`;
                     <span className="text-sm font-medium text-gray-900">
                       {currentTicket.subscriberId}
                     </span>
+                  </div>
+                  
                   {/* Fiche CRM - seulement si abonné Airtable avec lien CRM et pas "autre -" */}
                   {subscriber?.lienCRM && !currentTicket.subscriberId.toLowerCase().includes('autre -') && (
                     <div className="flex items-center justify-between py-2 border-b border-gray-100">
@@ -454,7 +454,7 @@ Priorité: ${currentTicket.priority}`;
                     </div>
                   )}
                   
-                  {/* Téléphone du client (uniquement si client Airtable) */}
+                  {/* Téléphone du client (uniquement si client Airtable et pas depuis email) */}
                   {subscriber?.telephone && !isFromEmail() && (
                     <div className="flex items-center justify-between py-2 border-b border-gray-100">
                       <span className="text-sm text-gray-600 flex items-center">
@@ -508,8 +508,6 @@ Priorité: ${currentTicket.priority}`;
                 </div>
               </div>
             )}
-
-            {/* Formulaire d'envoi d'email */}
 
             {/* Commentaires */}
             <div>
