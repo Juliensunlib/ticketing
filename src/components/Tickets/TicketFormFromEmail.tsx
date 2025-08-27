@@ -37,6 +37,12 @@ export const useAirtable = () => {
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
+    const config = getAirtableConfig();
+    
+    if (config) {
+      const service = new AirtableService(config.apiKey, config.subscribersBaseId);
+      setAirtableService(service);
+      
       console.log('✅ Configuration Airtable trouvée, chargement des données...');
       console.log('✅ Configuration Airtable trouvée, chargement des données...');
       console.log('✅ Configuration Airtable trouvée, chargement des données...');
@@ -49,6 +55,10 @@ export const useAirtable = () => {
         setInitialized(true);
       });
     } else {
+      console.log('ℹ️ Configuration Airtable non disponible, mode manuel activé');
+      setInitialized(true);
+    }
+    
     // Timeout de sécurité pour éviter le blocage
     const timeout = setTimeout(() => {
       if (!initialized) {
@@ -60,6 +70,8 @@ export const useAirtable = () => {
     
     return () => clearTimeout(timeout);
   }, []);
+
+  const loadDataWithService = async (service: AirtableService) => {
     setLoading(true);
     setError(null);
     

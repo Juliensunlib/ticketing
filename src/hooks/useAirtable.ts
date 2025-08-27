@@ -37,6 +37,38 @@ export const useAirtable = () => {
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
+    const config = getAirtableConfig();
+    const service = config ? new AirtableService(config.apiKey, config.subscribersBaseId) : null;
+    
+    const loadDataWithService = async (service: AirtableService) => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        let subscribersData: Subscriber[] = [];
+
+        try {
+          console.log('📋 Récupération des abonnés...');
+          console.log('🔄 Chargement des abonnés Airtable...');
+          subscribersData = await service.getSubscribers();
+          console.log(`✅ ${subscribersData.length} abonnés récupérés avec succès`);
+          console.log('✅ Abonnés chargés:', subscribersData.length);
+        } catch (err) {
+          console.error('❌ Erreur Airtable:', err);
+          setError(`ERREUR CRITIQUE Airtable: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
+          // Airtable non disponible - continuer avec tableau vide
+        }
+
+        setSubscribers(subscribersData);
+        
+      } catch (err) {
+        console.error('❌ Erreur générale lors du chargement:', err);
+        setError(`ERREUR GÉNÉRALE: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (config) {
       console.log('✅ Configuration Airtable trouvée, chargement des données...');
       console.log('✅ Configuration Airtable trouvée, chargement des données...');
@@ -64,33 +96,6 @@ export const useAirtable = () => {
     
     return () => clearTimeout(timeout);
   }, []);
-    setLoading(true);
-    setError(null);
-    
-    try {
-      let subscribersData: Subscriber[] = [];
-
-      try {
-        console.log('📋 Récupération des abonnés...');
-        console.log('🔄 Chargement des abonnés Airtable...');
-        subscribersData = await service.getSubscribers();
-        console.log(`✅ ${subscribersData.length} abonnés récupérés avec succès`);
-        console.log('✅ Abonnés chargés:', subscribersData.length);
-      } catch (err) {
-        console.error('❌ Erreur Airtable:', err);
-        setError(`ERREUR CRITIQUE Airtable: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
-        // Airtable non disponible - continuer avec tableau vide
-      }
-
-      setSubscribers(subscribersData);
-      
-    } catch (err) {
-      console.error('❌ Erreur générale lors du chargement:', err);
-      setError(`ERREUR GÉNÉRALE: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const loadData = async () => {
     console.log('🔄 useAirtable: Rechargement manuel des données...');
