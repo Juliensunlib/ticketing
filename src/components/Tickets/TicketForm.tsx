@@ -37,13 +37,17 @@ const TicketForm: React.FC<TicketFormProps> = ({ ticket, onClose, onSuccess }) =
 
   useEffect(() => {
     console.log('TicketForm: Chargement des abonnés...');
-    loadData();
+    if (loadData) {
+      loadData();
+    }
   }, []);
 
   useEffect(() => {
     console.log('TicketForm: Données mises à jour');
-    console.log('Abonnés:', subscribers);
-    console.log('Employés Supabase:', employees);
+    console.log('Abonnés Airtable:', subscribers.length);
+    console.log('Employés Supabase:', employees.length);
+    console.log('Loading:', loading);
+    console.log('Error:', error);
   }, [subscribers, employees]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -304,7 +308,12 @@ const TicketForm: React.FC<TicketFormProps> = ({ ticket, onClose, onSuccess }) =
                       value={subscriberSearch}
                       onChange={(e) => handleSubscriberSearchChange(e.target.value)}
                       onFocus={() => setShowSubscriberDropdown(true)}
-                      placeholder={subscribers.length === 0 ? 'Chargement des clients...' : 'Rechercher par nom, prénom ou contrat...'}
+                      placeholder={
+                        loading ? 'Chargement des clients...' : 
+                        error ? 'Erreur de chargement - Saisie manuelle possible' :
+                        subscribers.length === 0 ? 'Aucun client trouvé - Saisie manuelle possible' : 
+                        'Rechercher par nom, prénom ou contrat...'
+                      }
                       className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 ${
                         errors.subscriberId ? 'border-red-500' : 'border-gray-300'
                       }`}
@@ -312,9 +321,28 @@ const TicketForm: React.FC<TicketFormProps> = ({ ticket, onClose, onSuccess }) =
                   </div>
                   
                   {/* Dropdown des résultats */}
-                  {showSubscriberDropdown && subscribers.length > 0 && (
+                  {showSubscriberDropdown && (
                     <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                      {filteredSubscribers.length > 0 ? (
+                      {loading ? (
+                        <div className="px-4 py-3 text-center">
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-orange-500 mx-auto mb-2"></div>
+                          <div className="text-sm text-gray-600">Chargement des clients Airtable...</div>
+                        </div>
+                      ) : error ? (
+                        <div className="px-4 py-3 text-center">
+                          <div className="text-sm text-red-600 mb-2">❌ Erreur de chargement</div>
+                          <div className="text-xs text-gray-500">
+                            Vous pouvez saisir manuellement : "Prénom Nom - SL-000123"
+                          </div>
+                        </div>
+                      ) : subscribers.length === 0 ? (
+                        <div className="px-4 py-3 text-center">
+                          <div className="text-sm text-gray-600 mb-2">Aucun client Airtable disponible</div>
+                          <div className="text-xs text-gray-500">
+                            Vous pouvez saisir manuellement : "Prénom Nom - SL-000123"
+                          </div>
+                        </div>
+                      ) : filteredSubscribers.length > 0 ? (
                         filteredSubscribers.map((subscriber) => (
                           <button
                             key={subscriber.id}
@@ -350,6 +378,14 @@ const TicketForm: React.FC<TicketFormProps> = ({ ticket, onClose, onSuccess }) =
                     </div>
                   )}
                 </div>
+                
+                {/* Informations de debug pour l'administrateur */}
+                {error && (
+                  <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                    <strong>Erreur Airtable :</strong> {error}
+                  </div>
+                )}
+                
                 {errors.subscriberId && <p className="text-red-500 text-sm mt-1">{errors.subscriberId}</p>}
               </div>
 

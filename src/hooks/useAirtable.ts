@@ -28,8 +28,9 @@ export const useAirtable = () => {
       const service = new AirtableService(config.apiKey, config.subscribersBaseId);
       setAirtableService(service);
       // Charger les données en arrière-plan sans bloquer l'interface
-      loadDataWithService(service).catch(() => {
-        // Erreur déjà gérée dans loadDataWithService
+      loadDataWithService(service).catch((error) => {
+        console.error('Erreur lors du chargement initial des données Airtable:', error);
+        // Ne pas bloquer l'interface même en cas d'erreur
       });
     } else {
       console.warn('Configuration Airtable manquante');
@@ -39,26 +40,32 @@ export const useAirtable = () => {
   }, []);
 
   const loadDataWithService = async (service: AirtableService) => {
+    setLoading(true);
     try {
       let subscribersData: Subscriber[] = [];
 
       try {
+        console.log('🔄 Chargement des abonnés Airtable...');
         subscribersData = await service.getSubscribers();
+        console.log('✅ Abonnés chargés:', subscribersData.length);
       } catch (err) {
-        // Airtable non disponible - mode silencieux
+        console.error('❌ Erreur Airtable:', err);
+        // Airtable non disponible - continuer sans erreur
       }
 
       setSubscribers(subscribersData);
       
     } catch (err) {
-      // Erreur silencieuse
+      console.error('❌ Erreur générale lors du chargement:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
   const loadData = async () => {
     if (!airtableService) {
       console.warn('Service Airtable non initialisé. Vérifiez la configuration dans le fichier .env');
-      setError('Service Airtable non configuré. Ajoutez vos clés API dans le fichier .env');
+      setError('Service Airtable non configuré. Contactez l\'administrateur.');
       return;
     }
 
@@ -76,7 +83,7 @@ export const useAirtable = () => {
     } catch (err) {
       console.error('Erreur lors du chargement des données Airtable:', err);
       if (err instanceof Error && err.message.includes('Failed to fetch')) {
-        setError('Connexion à Airtable impossible. Vérifiez votre connexion internet et vos clés API.');
+        setError('Connexion à Airtable impossible. Contactez l\'administrateur si le problème persiste.');
       } else {
         setError(`Erreur lors du rechargement: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
       }
