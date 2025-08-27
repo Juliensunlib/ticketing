@@ -54,24 +54,6 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
     }
   }, []);
 
-  // Recharger les emails traités quand on revient sur la page
-  useEffect(() => {
-    const handleFocus = () => {
-      const stored = localStorage.getItem('processed_emails');
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          setProcessedEmails(new Set(parsed));
-        } catch (error) {
-          console.error('Erreur parsing processed_emails:', error);
-        }
-      }
-    };
-
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, []);
-
   // Sauvegarder les emails traités
   const saveProcessedEmails = (emailIds: Set<string>) => {
     localStorage.setItem('processed_emails', JSON.stringify([...emailIds]));
@@ -301,43 +283,47 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
     }
   };
 
-  const handleDeleteEmail = async (email: Email, action: 'hide' | 'trash' | 'delete') => {
+  const handleDeleteEmail = async (email: any, action: 'hide' | 'trash' | 'delete') => {
     try {
+      setShowOptionsMenu(null); // Fermer le menu
+      
       if (action === 'hide') {
         // Masquer seulement dans l'outil
         const newProcessedEmails = new Set(processedEmails);
         newProcessedEmails.add(email.id);
         setProcessedEmails(newProcessedEmails);
         saveProcessedEmails(newProcessedEmails);
-        alert('Email masqué de l\'outil');
+        alert('Email masqué de l\'outil (toujours dans Gmail)');
+        
       } else if (action === 'trash') {
         // Déplacer vers la corbeille Gmail
         await gmailService.trashEmail(email.id);
-        // Aussi masquer localement
-        const newProcessedEmails = new Set(processedEmails);
-        newProcessedEmails.add(email.id);
-        setProcessedEmails(newProcessedEmails);
-        saveProcessedEmails(newProcessedEmails);
+        
+        // Retirer de la liste locale
+        setEmails(prev => prev.filter(e => e.id !== email.id));
         alert('Email déplacé vers la corbeille Gmail');
+        
       } else if (action === 'delete') {
-        // Supprimer définitivement
-        if (confirm('⚠️ ATTENTION : Cette action supprimera définitivement l\'email de Gmail. Cette action est IRRÉVERSIBLE. Continuer ?')) {
+        // Confirmation pour suppression définitive
+        const confirmed = window.confirm(
+          '⚠️ ATTENTION !\n\nCette action va supprimer définitivement l\'email de Gmail.\nCette action est IRRÉVERSIBLE.\n\nÊtes-vous sûr de vouloir continuer ?'
+        );
+        
+        if (confirmed) {
           await gmailService.deleteEmail(email.id);
-          // Aussi masquer localement
-          const newProcessedEmails = new Set(processedEmails);
-          newProcessedEmails.add(email.id);
-          setProcessedEmails(newProcessedEmails);
-          saveProcessedEmails(newProcessedEmails);
+          
+          // Retirer de la liste locale
+          setEmails(prev => prev.filter(e => e.id !== email.id));
           alert('Email supprimé définitivement de Gmail');
         }
       }
+      
     } catch (error) {
       console.error('Erreur lors de la suppression:', error);
-      alert(`Erreur lors de la ${action === 'hide' ? 'masquage' : action === 'trash' ? 'mise en corbeille' : 'suppression'} de l'email`);
-    } finally {
-      setShowOptionsMenu(null);
+      alert(`Erreur lors de la suppression: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
     }
   };
+
   const handleAttachToExistingTicket = (email: Email) => {
     setSelectedEmailForAttach(email);
     setShowAttachToTicket(true);
@@ -816,53 +802,67 @@ ${selectedEmailForAttach.body || selectedEmailForAttach.snippet}`;
                           <Link className="w-3 h-3 mr-1" />
                           Attacher
                         </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                           setShowDeleteOptions(email.id);
-                          }}
-                         className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition-colors flex items-center"
-                         title="Options de suppression"
-                        >
-                         ⋮
-                        </button>
-                       
-                       {/* Menu déroulant des options de suppression */}
-                       {showDeleteOptions === email.id && (
-                         <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-48">
-                           <button
-                             onClick={(e) => {
-                               e.stopPropagation();
-                               handleHideEmail(email.id, email.subject);
-                               setShowDeleteOptions(null);
-                             }}
-                             className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
-                           >
-                             <X className="w-4 h-4 mr-2" />
-                             Masquer de l'outil
-                           </button>
-                           <button
-                             onClick={(e) => {
-                               e.stopPropagation();
-                               handleTrashEmail(email.id, email.subject);
-                               setShowDeleteOptions(null);
-                             }}
-                             className="w-full text-left px-3 py-2 text-sm text-orange-700 hover:bg-orange-50 flex items-center"
-                           >
-                             🗑️ Corbeille Gmail
-                           </button>
-                           <button
-                             onClick={(e) => {
-                               e.stopPropagation();
-                               handleDeleteEmailPermanently(email.id, email.subject);
-                               setShowDeleteOptions(null);
-                             }}
-                             className="w-full text-left px-3 py-2 text-sm text-red-700 hover:bg-red-50 flex items-center border-t border-gray-200"
-                           >
-                             ⚠️ Supprimer définitivement
-                           </button>
-                         </div>
-                       )}
+                        
+                        {/* Bouton d'options */}
+                        <div className="relative inline-block">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowOptionsMenu(showOptionsMenu === email.id ? null : email.id);
+                            }}
+                            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                            title="Options"
+                          >
+                            <span className="text-lg">⋮</span>
+                          </button>
+                          
+                          {/* Menu déroulant */}
+                          {showOptionsMenu === email.id && (
+                            <>
+                              {/* Overlay pour fermer le menu */}
+                              <div 
+                                className="fixed inset-0 z-40"
+                                onClick={() => setShowOptionsMenu(null)}
+                              />
+                              
+                              {/* Menu */}
+                              <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-48">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteEmail(email, 'hide');
+                                  }}
+                                  className="w-full text-left px-4 py-2 hover:bg-gray-50 flex items-center text-gray-700"
+                                >
+                                  <span className="mr-2">👁️</span>
+                                  Masquer de l'outil
+                                </button>
+                                
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteEmail(email, 'trash');
+                                  }}
+                                  className="w-full text-left px-4 py-2 hover:bg-gray-50 flex items-center text-orange-600"
+                                >
+                                  <span className="mr-2">🗑️</span>
+                                  Corbeille Gmail
+                                </button>
+                                
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteEmail(email, 'delete');
+                                  }}
+                                  className="w-full text-left px-4 py-2 hover:bg-gray-50 flex items-center text-red-600 border-t border-gray-100"
+                                >
+                                  <span className="mr-2">⚠️</span>
+                                  Supprimer définitivement
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </div>
                     ) : (
                       <div className="flex items-center space-x-1">
@@ -1026,36 +1026,47 @@ ${selectedEmailForAttach.body || selectedEmailForAttach.snippet}`;
                     <Link className="w-4 h-4 mr-2" />
                     Attacher
                   </button>
-                  <div className="relative">
-                    <button
-                      onClick={() => setShowOptionsMenu(showOptionsMenu === selectedEmail.id ? null : selectedEmail.id)}
-                      className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
-                    >
-                      Options ⋮
-                    </button>
-                    {showOptionsMenu === selectedEmail.id && (
-                      <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
-                        <button
-                          onClick={() => handleDeleteEmail(selectedEmail, 'hide')}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-t-lg"
-                        >
-                          👁️ Masquer de l'outil
-                        </button>
-                        <button
-                          onClick={() => handleDeleteEmail(selectedEmail, 'trash')}
-                          className="w-full text-left px-4 py-2 text-sm text-orange-700 hover:bg-orange-50"
-                        >
-                          🗑️ Corbeille Gmail
-                        </button>
-                        <button
-                          onClick={() => handleDeleteEmail(selectedEmail, 'delete')}
-                          className="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 rounded-b-lg"
-                        >
-                          ⚠️ Supprimer définitivement
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  <button
+                    onClick={() => handleDeleteEmail(selectedEmail.id, selectedEmail.subject)}
+                    className="px-4 py-2 border border-red-300 hover:bg-red-50 text-red-700 rounded-lg transition-colors flex items-center"
+                    title="Supprimer cet email"
+                  >
+                    ⋮ Options
+                  </button>
+                  
+                  {/* Menu déroulant pour l'email sélectionné */}
+                  {showDeleteOptions === selectedEmail.id && (
+                    <div className="absolute right-0 top-12 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-48">
+                      <button
+                        onClick={() => {
+                          handleHideEmail(selectedEmail.id, selectedEmail.subject);
+                          setShowDeleteOptions(null);
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                      >
+                        <X className="w-4 h-4 mr-2" />
+                        Masquer de l'outil
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleTrashEmail(selectedEmail.id, selectedEmail.subject);
+                          setShowDeleteOptions(null);
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-orange-700 hover:bg-orange-50 flex items-center"
+                      >
+                        🗑️ Corbeille Gmail
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleDeleteEmailPermanently(selectedEmail.id, selectedEmail.subject);
+                          setShowDeleteOptions(null);
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-red-700 hover:bg-red-50 flex items-center border-t border-gray-200"
+                      >
+                        ⚠️ Supprimer définitivement
+                      </button>
+                    </div>
+                  )}
                   <button
                     onClick={() => setShowReplyForm(!showReplyForm)}
                     className="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors flex items-center"
@@ -1124,14 +1135,6 @@ ${selectedEmailForAttach.body || selectedEmailForAttach.snippet}`;
         <div 
           className="fixed inset-0 z-5"
           onClick={() => setShowDeleteOptions(null)}
-        />
-      )}
-
-      {/* Overlay pour fermer le menu d'options */}
-      {showOptionsMenu && (
-        <div 
-          className="fixed inset-0 z-5"
-          onClick={() => setShowOptionsMenu(null)}
         />
       )}
 
