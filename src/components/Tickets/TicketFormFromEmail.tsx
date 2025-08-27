@@ -130,6 +130,8 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
     }
 
     try {
+      console.log('🎫 Création du ticket depuis email...');
+      
       // Préparer les données selon le type d'abonné
       let ticketData = { ...formData };
       
@@ -139,9 +141,16 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
           `${manualSubscriberName} <${manualEmail}>` : 
           manualEmail;
         ticketData.subscriberId = displayName;
+      } else {
+        // Pour Airtable, utiliser le nom affiché dans la recherche
+        ticketData.subscriberId = subscriberSearch;
       }
       
-      createTicket(ticketData);
+      console.log('🎫 Données du ticket:', ticketData);
+      
+      // Créer le ticket
+      const result = createTicket(ticketData);
+      console.log('✅ Ticket créé:', result);
       
       onSuccess();
       onClose();

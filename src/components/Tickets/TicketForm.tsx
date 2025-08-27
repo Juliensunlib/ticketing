@@ -37,9 +37,7 @@ const TicketForm: React.FC<TicketFormProps> = ({ ticket, onClose, onSuccess }) =
 
   useEffect(() => {
     console.log('TicketForm: Chargement des abonnés...');
-    if (loadData) {
-      loadData();
-    }
+    loadData();
   }, []);
 
   useEffect(() => {
@@ -124,7 +122,7 @@ const TicketForm: React.FC<TicketFormProps> = ({ ticket, onClose, onSuccess }) =
 
   const handleSubscriberSearchChange = (value: string) => {
     setSubscriberSearch(value);
-    setShowSubscriberDropdown(true); // Toujours afficher le dropdown
+    setShowSubscriberDropdown(subscribers.length > 0);
     // Réinitialiser la sélection si l'utilisateur tape
     if (formData.subscriberId) {
       setFormData(prev => ({ ...prev, subscriberId: '' }));
@@ -306,7 +304,7 @@ const TicketForm: React.FC<TicketFormProps> = ({ ticket, onClose, onSuccess }) =
                       value={subscriberSearch}
                       onChange={(e) => handleSubscriberSearchChange(e.target.value)}
                       onFocus={() => setShowSubscriberDropdown(true)}
-                      placeholder={subscribers.length === 0 ? 'Chargement des abonnés... ou saisir manuellement' : 'Rechercher un abonné par nom, prénom ou contrat...'}
+                      placeholder={subscribers.length === 0 ? 'Chargement des clients...' : 'Rechercher par nom, prénom ou contrat...'}
                       className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 ${
                         errors.subscriberId ? 'border-red-500' : 'border-gray-300'
                       }`}
@@ -314,16 +312,9 @@ const TicketForm: React.FC<TicketFormProps> = ({ ticket, onClose, onSuccess }) =
                   </div>
                   
                   {/* Dropdown des résultats */}
-                  {showSubscriberDropdown && (
+                  {showSubscriberDropdown && subscribers.length > 0 && (
                     <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                      {subscribers.length === 0 ? (
-                        <div className="px-4 py-3 text-gray-500 text-center">
-                          <div className="animate-pulse">Chargement des abonnés Airtable...</div>
-                          <div className="text-xs mt-2">
-                            Ou saisissez manuellement : "Prénom Nom - SL-000123"
-                          </div>
-                        </div>
-                      ) : filteredSubscribers.length > 0 ? (
+                      {filteredSubscribers.length > 0 ? (
                         filteredSubscribers.map((subscriber) => (
                           <button
                             key={subscriber.id}
@@ -360,16 +351,6 @@ const TicketForm: React.FC<TicketFormProps> = ({ ticket, onClose, onSuccess }) =
                   )}
                 </div>
                 {errors.subscriberId && <p className="text-red-500 text-sm mt-1">{errors.subscriberId}</p>}
-                
-                {/* Informations de debug */}
-                {process.env.NODE_ENV === 'development' && (
-                  <div className="mt-2 p-2 bg-gray-100 rounded text-xs">
-                    <div>Abonnés chargés: {subscribers.length}</div>
-                    <div>Recherche: "{subscriberSearch}"</div>
-                    <div>Dropdown ouvert: {showSubscriberDropdown ? 'Oui' : 'Non'}</div>
-                    <div>Résultats filtrés: {filteredSubscribers.length}</div>
-                  </div>
-                )}
               </div>
 
               <div>
