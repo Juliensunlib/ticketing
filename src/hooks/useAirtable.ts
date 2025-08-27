@@ -46,6 +46,7 @@ export const useAirtable = () => {
   const [loading, setLoading] = useState(globalLoading);
   const [error, setError] = useState<string | null>(globalError);
   const [initialized, setInitialized] = useState(globalInitialized);
+  const [forceUpdate, setForceUpdate] = useState(0);
 
   useEffect(() => {
     // Si déjà initialisé globalement, utiliser les données en cache
