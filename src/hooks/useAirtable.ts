@@ -43,6 +43,17 @@ export const useAirtable = () => {
       setError(null);
       setInitialized(true);
     }
+    
+    // Timeout de sécurité pour éviter le blocage
+    const timeout = setTimeout(() => {
+      if (!initialized) {
+        console.warn('⚠️ Timeout d\'initialisation Airtable, déblocage forcé');
+        setInitialized(true);
+        setLoading(false);
+      }
+    }, 5000); // 5 secondes maximum
+    
+    return () => clearTimeout(timeout);
   }, []);
 
   const loadDataWithService = async (service: AirtableService) => {
