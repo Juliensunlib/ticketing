@@ -37,9 +37,11 @@ export const useAirtable = () => {
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
+    
+    const loadDataWithService = async (service: AirtableService) => {
       console.log('✅ Configuration Airtable trouvée, chargement des données...');
       console.log('✅ Configuration Airtable trouvée, chargement des données...');
-      console.log('✅ Configuration Airtable trouvée, chargement des données...');
+      setError(null);
       
       try {
         let subscribersData: Subscriber[] = [];
@@ -67,9 +69,10 @@ export const useAirtable = () => {
     if (config) {
       console.log('🚀 Initialisation du service Airtable...');
       console.log('✅ Configuration Airtable trouvée, chargement des données...');
+      const service = new AirtableService(config.apiKey, config.subscribersBaseId);
       setAirtableService(service);
       // Charger les données en arrière-plan sans bloquer l'interface
-      loadDataWithService(service).catch((error) => {
+      initializeAirtable().catch((error) => {
         console.error('Erreur lors du chargement initial des données Airtable:', error);
         // Ne pas bloquer l'interface même en cas d'erreur
         setError(`Connexion Airtable impossible: ${error.message}`);
@@ -77,10 +80,13 @@ export const useAirtable = () => {
         setInitialized(true);
       });
     } else {
-    
-    return () => clearTimeout(timeout);
+        console.error('❌ Configuration Airtable invalide ou manquante');
+        setInitialized(true);
+      }, 5000); // 5 secondes maximum
+    }
   }, []);
-
+      const service = new AirtableService(config.apiKey, config.subscribersBaseId);
+      setAirtableService(service);
   const loadData = async () => {
     console.log('🔄 useAirtable: Rechargement manuel des données...');
     if (!airtableService) {
@@ -150,6 +156,8 @@ export const useAirtable = () => {
     }
   };
 
+  console.log('✅ Configuration Airtable valide');
+  
   return {
     subscribers,
     loading,
@@ -158,6 +166,5 @@ export const useAirtable = () => {
     loadData,
     createTicket,
     updateTicket,
-  console.log('✅ Configuration Airtable valide');
   };
 };
