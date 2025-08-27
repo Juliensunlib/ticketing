@@ -36,6 +36,9 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
   const [selectedEmailForAttach, setSelectedEmailForAttach] = useState<Email | null>(null);
   const [ticketSearchTerm, setTicketSearchTerm] = useState('');
 
+  // Récupérer addComment depuis useTickets au niveau du composant
+  const { addComment } = useTickets();
+
   // Charger les emails traités depuis le localStorage
   useEffect(() => {
     try {
@@ -249,7 +252,6 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
     if (!selectedEmailForAttach) return;
 
     try {
-      const { addComment } = useTickets();
       const emailContent = `📧 Email attaché depuis la boîte de réception :
 
 De: ${selectedEmailForAttach.from}
