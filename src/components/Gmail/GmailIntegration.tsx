@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Plus, Search, RefreshCw, Calendar, User, Paperclip, ExternalLink, Key, CheckCircle, AlertCircle, Send, X } from 'lucide-react';
+import { Mail, Plus, Search, RefreshCw, Calendar, User, Paperclip, ExternalLink, Key, CheckCircle, AlertCircle, Send, X, Inbox, Archive, FileText } from 'lucide-react';
 import gmailService from '../../services/gmailService';
+import { useTickets } from '../../hooks/useTickets';
 
 interface Email {
   id: string;
@@ -21,6 +22,7 @@ interface GmailIntegrationProps {
 const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromEmail }) => {
   const [emails, setEmails] = useState<Email[]>([]);
   const [processedEmails, setProcessedEmails] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState<'inbox' | 'processed'>('inbox');
   const [loading, setLoading] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -29,6 +31,7 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
   const [showReplyForm, setShowReplyForm] = useState(false);
   const [replyContent, setReplyContent] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
+  const { tickets } = useTickets();
 
   // Charger les emails traités depuis le localStorage
   useEffect(() => {
@@ -306,6 +309,32 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
   const unreadCount = emails.filter(email => !email.isRead).length;
   const processedCount = emails.filter(email => processedEmails.has(email.id)).length;
 
+  // Filtrer les emails selon l'onglet actif
+  const getEmailsForTab = () => {
+    if (activeTab === 'inbox') {
+      return filteredEmails;
+    } else {
+      // Onglet "Mails traités" - emails qui ont été traités
+      return emails.filter(email => 
+        processedEmails.has(email.id) && (
+          email.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          email.from.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          email.snippet.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      );
+    }
+  };
+
+  // Trouver le ticket associé à un email traité
+  const getTicketForEmail = (email: Email) => {
+    // Chercher un ticket qui contient l'ID de l'email dans sa description
+    return tickets.find(ticket => 
+      ticket.description.includes(email.id) ||
+      ticket.description.includes(email.subject) ||
+      ticket.description.includes(email.from)
+    );
+  };
+
   // Gestion de l'état de chargement initial
   if (loading && emails.length === 0 && !authError) {
     return (
@@ -472,23 +501,80 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Liste des emails */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+          {/* Onglets */}
+          <div className="border-b border-gray-200">
+            <nav className="flex space-x-8 px-6" aria-label="Tabs">
+              <button
+                onClick={() => {
+                  setActiveTab('inbox');
+                  setSelectedEmail(null);
+                }}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'inbox'
+                    ? 'border-orange-500 text-orange-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center">
+                  <Inbox className="w-4 h-4 mr-2" />
+                  Boîte de réception
+                  {filteredEmails.length > 0 && (
+                    <span className="ml-2 bg-orange-100 text-orange-800 text-xs font-medium px-2 py-1 rounded-full">
+                      {filteredEmails.length}
+                    </span>
+                  )}
+                </div>
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('processed');
+                  setSelectedEmail(null);
+                }}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'processed'
+                    ? 'border-orange-500 text-orange-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center">
+                  <Archive className="w-4 h-4 mr-2" />
+                  Mails traités
+                  {processedCount > 0 && (
+                    <span className="ml-2 bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">
+                      {processedCount}
+                    </span>
+                  )}
+                </div>
+              </button>
+            </nav>
+          </div>
+
           <div className="p-4 border-b border-gray-200">
             <h2 className="text-lg font-semibold text-gray-900">
-              Boîte de réception ({filteredEmails.length})
+              {activeTab === 'inbox' ? 'Boîte de réception' : 'Mails traités'} ({getEmailsForTab().length})
             </h2>
           </div>
           
           <div className="divide-y divide-gray-200 max-h-96 overflow-y-auto">
-            {loading && emails.length === 0 ? (
+            {loading && getEmailsForTab().length === 0 ? (
               <div className="p-8 text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-4"></div>
                 <p className="text-gray-600">Chargement des emails...</p>
               </div>
-            ) : filteredEmails.length === 0 ? (
+            ) : getEmailsForTab().length === 0 ? (
               <div className="p-8 text-center">
-                <Mail className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                {activeTab === 'inbox' ? (
+                  <Inbox className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                ) : (
+                  <Archive className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                )}
                 <p className="text-gray-600">
-                  {searchTerm ? 'Aucun email trouvé pour cette recherche' : 'Aucun email dans votre boîte de réception'}
+                  {searchTerm 
+                    ? 'Aucun email trouvé pour cette recherche' 
+                    : activeTab === 'inbox' 
+                      ? 'Aucun email dans votre boîte de réception'
+                      : 'Aucun email traité'
+                  }
                 </p>
                 {!loading && emails.length === 0 && !authError && (
                   <button
@@ -500,7 +586,10 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
                 )}
               </div>
             ) : (
-              filteredEmails.map((email) => (
+              getEmailsForTab().map((email) => {
+                const associatedTicket = activeTab === 'processed' ? getTicketForEmail(email) : null;
+                
+                return (
                 <div
                   key={email.id}
                   onClick={() => {
@@ -519,6 +608,14 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
                         {email.subject}
                       </h3>
                       <p className="text-xs text-gray-500 mt-1">{email.from}</p>
+                      {activeTab === 'processed' && associatedTicket && (
+                        <div className="flex items-center mt-1">
+                          <FileText className="w-3 h-3 text-green-600 mr-1" />
+                          <span className="text-xs text-green-600 font-medium">
+                            Ticket #{associatedTicket.id}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center space-x-2">
                       {email.hasAttachments && (
@@ -526,6 +623,9 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
                       )}
                       {!email.isRead && (
                         <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                      )}
+                      {activeTab === 'processed' && (
+                        <div className="w-2 h-2 bg-green-500 rounded-full" title="Email traité"></div>
                       )}
                     </div>
                   </div>
@@ -536,32 +636,48 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
                     <span className="text-xs text-gray-500">
                       {formatDate(email.date)}
                     </span>
-                    <div className="flex items-center space-x-1">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCreateTicket(email);
-                        }}
-                        className="text-xs px-2 py-1 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded transition-colors flex items-center"
-                        title="Créer un ticket depuis cet email"
-                      >
-                        <Plus className="w-3 h-3 mr-1" />
-                        Créer ticket
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteEmail(email.id, email.subject);
-                        }}
-                        className="text-xs px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded transition-colors flex items-center"
-                        title="Supprimer cet email de la liste"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
+                    {activeTab === 'inbox' ? (
+                      <div className="flex items-center space-x-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCreateTicket(email);
+                          }}
+                          className="text-xs px-2 py-1 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded transition-colors flex items-center"
+                          title="Créer un ticket depuis cet email"
+                        >
+                          <Plus className="w-3 h-3 mr-1" />
+                          Créer ticket
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteEmail(email.id, email.subject);
+                          }}
+                          className="text-xs px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded transition-colors flex items-center"
+                          title="Supprimer cet email de la liste"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-1">
+                        {associatedTicket ? (
+                          <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded flex items-center">
+                            <FileText className="w-3 h-3 mr-1" />
+                            Ticket #{associatedTicket.id}
+                          </span>
+                        ) : (
+                          <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded">
+                            Traité
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
@@ -569,11 +685,55 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
         {/* Détail de l'email sélectionné */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200">
           <div className="p-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Détail de l'email</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">Détail de l'email</h2>
+              {selectedEmail && activeTab === 'processed' && (
+                <div className="flex items-center text-green-600">
+                  <Archive className="w-4 h-4 mr-1" />
+                  <span className="text-sm font-medium">Email traité</span>
+                </div>
+              )}
+            </div>
           </div>
           
           {selectedEmail ? (
             <div className="p-4 space-y-4">
+              {/* Informations sur le ticket associé pour les emails traités */}
+              {activeTab === 'processed' && (() => {
+                const associatedTicket = getTicketForEmail(selectedEmail);
+                return associatedTicket ? (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <FileText className="w-4 h-4 text-green-600 mr-2" />
+                        <span className="text-sm font-medium text-green-900">
+                          Ticket associé : #{associatedTicket.id}
+                        </span>
+                      </div>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        associatedTicket.status === 'Fermé' 
+                          ? 'bg-gray-100 text-gray-800'
+                          : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        {associatedTicket.status}
+                      </span>
+                    </div>
+                    <p className="text-sm text-green-800 mt-1">
+                      {associatedTicket.title}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    <div className="flex items-center">
+                      <Archive className="w-4 h-4 text-gray-600 mr-2" />
+                      <span className="text-sm text-gray-700">
+                        Email traité sans ticket associé trouvé
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div>
                 <h3 className="font-semibold text-gray-900 mb-2">{selectedEmail.subject}</h3>
                 <div className="space-y-2 text-sm text-gray-600">
@@ -645,41 +805,81 @@ const GmailIntegration: React.FC<GmailIntegrationProps> = ({ onCreateTicketFromE
                 </div>
               )}
               
-              <div className="flex space-x-3 pt-4 border-t border-gray-200">
-                <button
-                  onClick={() => handleCreateTicket(selectedEmail)}
-                  className="flex-1 flex items-center justify-center px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Créer un ticket
-                </button>
-                <button
-                  onClick={() => handleDeleteEmail(selectedEmail.id, selectedEmail.subject)}
-                  className="px-4 py-2 border border-red-300 hover:bg-red-50 text-red-700 rounded-lg transition-colors flex items-center"
-                  title="Supprimer cet email"
-                >
-                  <X className="w-4 h-4 mr-2" />
-                  Supprimer
-                </button>
-                <button
-                  onClick={() => setShowReplyForm(!showReplyForm)}
-                  className="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors flex items-center"
-                >
-                  <Send className="w-4 h-4 mr-2" />
-                  Répondre
-                </button>
-                <button
-                  onClick={() => window.open(`mailto:${selectedEmail.from}`, '_blank')}
-                  className="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                </button>
-              </div>
+              {activeTab === 'inbox' ? (
+                <div className="flex space-x-3 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => handleCreateTicket(selectedEmail)}
+                    className="flex-1 flex items-center justify-center px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Créer un ticket
+                  </button>
+                  <button
+                    onClick={() => handleDeleteEmail(selectedEmail.id, selectedEmail.subject)}
+                    className="px-4 py-2 border border-red-300 hover:bg-red-50 text-red-700 rounded-lg transition-colors flex items-center"
+                    title="Supprimer cet email"
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Supprimer
+                  </button>
+                  <button
+                    onClick={() => setShowReplyForm(!showReplyForm)}
+                    className="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors flex items-center"
+                  >
+                    <Send className="w-4 h-4 mr-2" />
+                    Répondre
+                  </button>
+                  <button
+                    onClick={() => window.open(`mailto:${selectedEmail.from}`, '_blank')}
+                    className="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex space-x-3 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => setShowReplyForm(!showReplyForm)}
+                    className="flex-1 flex items-center justify-center px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors"
+                  >
+                    <Send className="w-4 h-4 mr-2" />
+                    Répondre
+                  </button>
+                  <button
+                    onClick={() => window.open(`mailto:${selectedEmail.from}`, '_blank')}
+                    className="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Remettre l'email dans la boîte de réception
+                      const newProcessedEmails = new Set(processedEmails);
+                      newProcessedEmails.delete(selectedEmail.id);
+                      setProcessedEmails(newProcessedEmails);
+                      saveProcessedEmails(newProcessedEmails);
+                      setActiveTab('inbox');
+                      setSelectedEmail(null);
+                    }}
+                    className="px-4 py-2 border border-blue-300 hover:bg-blue-50 text-blue-700 rounded-lg transition-colors flex items-center"
+                    title="Remettre dans la boîte de réception"
+                  >
+                    <Inbox className="w-4 h-4 mr-2" />
+                    Restaurer
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="p-8 text-center">
-              <Mail className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">Sélectionnez un email pour voir les détails</p>
+              {activeTab === 'inbox' ? (
+                <Inbox className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              ) : (
+                <Archive className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              )}
+              <p className="text-gray-600">
+                Sélectionnez un email pour voir les détails
+              </p>
             </div>
           )}
         </div>
