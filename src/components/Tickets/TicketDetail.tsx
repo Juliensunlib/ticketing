@@ -102,31 +102,55 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose }) => {
         return;
       }
 
-      // Extraire l'email de l'abonné depuis le subscriberId
-      const emailMatch = currentTicket.subscriberId?.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-      const subscriberEmail = emailMatch ? emailMatch[1] : null;
+      console.log('🔍 Recherche email pour abonné:', currentTicket.subscriberId);
       
+      let subscriberEmail = null;
+      
+      // 1. D'abord, chercher un email directement dans le subscriberId (format "Nom <email@domain.com>")
+      const emailInSubscriberIdMatch = currentTicket.subscriberId?.match(/<([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})>/);
+      if (emailInSubscriberIdMatch) {
+        subscriberEmail = emailInSubscriberIdMatch[1];
+        console.log('✅ Email trouvé dans subscriberId (format <email>):', subscriberEmail);
+      }
+      
+      // 2. Si pas trouvé, chercher un email simple dans le subscriberId
       if (!subscriberEmail) {
-        // Chercher dans les abonnés Airtable
+        const emailMatch = currentTicket.subscriberId?.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+        if (emailMatch) {
+          subscriberEmail = emailMatch[1];
+          console.log('✅ Email trouvé dans subscriberId (format simple):', subscriberEmail);
+        }
+      }
+      
+      // 3. Si toujours pas trouvé, chercher dans les abonnés Airtable
+      if (!subscriberEmail) {
+        console.log('🔍 Recherche dans Airtable...');
         const subscriber = subscribers.find(sub => 
           currentTicket.subscriberId?.includes(sub.contratAbonne) || 
-          currentTicket.subscriberId?.includes(`${sub.prenom} ${sub.nom}`)
+          currentTicket.subscriberId?.includes(`${sub.prenom} ${sub.nom}`) ||
+          currentTicket.subscriberId?.includes(sub.nom) ||
+          currentTicket.subscriberId?.includes(sub.prenom)
         );
         
-        if (!subscriber?.email) {
-          alert('Impossible de trouver l\'email de l\'abonné. Ajoutez l\'email dans Airtable ou utilisez votre client email habituel.');
-          setSendingComment(false);
-          return;
+        if (subscriber?.email) {
+          subscriberEmail = subscriber.email;
+          console.log('✅ Email trouvé dans Airtable:', subscriberEmail);
+        } else {
+          console.log('❌ Abonné trouvé dans Airtable mais sans email:', subscriber);
         }
       }
 
-      const finalEmail = subscriberEmail || subscribers.find(sub => 
-        currentTicket.subscriberId?.includes(sub.contratAbonne) || 
-        currentTicket.subscriberId?.includes(`${sub.prenom} ${sub.nom}`)
-      )?.email;
-
-      if (!finalEmail) {
-        alert('Email de l\'abonné introuvable');
+      // 4. Vérification finale
+      if (!subscriberEmail) {
+        console.log('❌ Aucun email trouvé pour:', currentTicket.subscriberId);
+        console.log('📋 Abonnés disponibles:', subscribers.map(s => ({ nom: s.nom, prenom: s.prenom, email: s.email, contrat: s.contratAbonne })));
+        
+        alert(`Impossible de trouver l'email de l'abonné "${currentTicket.subscriberId}". 
+        
+Vérifiez que :
+- L'email est présent dans Airtable pour cet abonné
+- Le nom de l'abonné correspond exactement
+- Ou utilisez votre client email habituel`);
         setSendingComment(false);
         return;
       }
@@ -148,14 +172,14 @@ Ticket #${currentTicket.id} - ${currentTicket.title}
 Statut: ${currentTicket.status}
 Priorité: ${currentTicket.priority}`;
 
-      console.log('📧 Envoi email vers:', finalEmail);
+      console.log('📧 Envoi email vers:', subscriberEmail);
       console.log('📧 Sujet:', subject);
       
       // Envoyer l'email via Gmail (nouveau email, pas une réponse)
-      await gmailService.sendEmail(finalEmail, subject, emailBody);
+      await gmailService.sendEmail(subscriberEmail, subject, emailBody);
       
       // Ajouter aussi un commentaire au ticket
-      await addComment(currentTicket.id, `📧 Email envoyé à ${finalEmail} :\n\nSujet: ${subject}\n\n${newComment}`);
+      await addComment(currentTicket.id, `📧 Email envoyé à ${subscriberEmail} :\n\nSujet: ${subject}\n\n${newComment}`);
       
       setNewComment('');
       setEmailSubject('');
