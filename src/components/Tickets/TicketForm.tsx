@@ -154,7 +154,7 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
             {/* Sélection du client */}
             <div className="space-y-4">
               <label className="block text-sm font-medium text-gray-700">
-                Client *
+                Abonné *
               </label>
               
               {isAirtableAvailable ? (
@@ -162,13 +162,13 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
                   <select
                     value={selectedSubscriber || (isManualEntry ? 'manual' : '')}
                     onChange={(e) => handleSubscriberChange(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
                     required={!isManualEntry}
                   >
-                    <option value="">Sélectionner un client</option>
+                    <option value="">Sélectionner un abonné</option>
                     {subscribers.map((subscriber) => (
                       <option key={subscriber.id} value={subscriber.id}>
-                        {subscriber.name} - {subscriber.email}
+                        {subscriber.prenom} {subscriber.nom} - {subscriber.contratAbonne}
                       </option>
                     ))}
                     <option value="manual">➕ Saisie manuelle</option>
@@ -181,7 +181,7 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
                     <span className="font-medium">Mode saisie manuelle</span>
                   </div>
                   <p className="text-sm text-yellow-700">
-                    Saisissez manuellement les informations du client
+                    Saisissez manuellement les informations de l'abonné
                   </p>
                 </div>
               )}
