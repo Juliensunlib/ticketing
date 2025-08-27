@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Search } from 'lucide-react';
-import { useAirtable } from '../../hooks/useAirtable';
+import { useSupabaseSubscribers } from '../../hooks/useSupabaseSubscribers';
 import { useTickets } from '../../hooks/useTickets';
 import { useSupabaseUsers } from '../../hooks/useSupabaseUsers';
 import { Send, User, Mail, AlertCircle, Clock, Flag } from 'lucide-react';
@@ -11,15 +11,10 @@ interface TicketFormProps {
 }
 
 const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
-  const { subscribers, loading: airtableLoading, error: airtableError, initialized } = useAirtable();
+  const { subscribers, loading: subscribersLoading, error: subscribersError, initialized, syncFromAirtable } = useSupabaseSubscribers();
   const { createTicket, loading: createLoading } = useTickets();
   const { users } = useSupabaseUsers();
   
-  // État local pour forcer les re-renders
-  const [localSubscribers, setLocalSubscribers] = useState(subscribers);
-  const [localInitialized, setLocalInitialized] = useState(initialized);
-  const [localError, setLocalError] = useState(airtableError);
-
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -40,79 +35,29 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [filteredSubscribers, setFilteredSubscribers] = useState(subscribers);
-  const [localForceUpdate, setLocalForceUpdate] = useState(0);
+  const [syncing, setSyncing] = useState(false);
 
-  // Vérifier si Airtable est disponible
-  const isAirtableAvailable = localInitialized && localSubscribers.length > 0 && !localError;
+  // Vérifier si les abonnés sont disponibles
+  const isSubscribersAvailable = initialized && subscribers.length > 0 && !subscribersError;
 
-  // Debug pour voir l'état en temps réel
+  // Synchroniser avec Airtable au premier chargement si aucun abonné
   useEffect(() => {
-    console.log('🔍 TicketForm - État Airtable:', {
-      initialized: localInitialized,
-      subscribersCount: localSubscribers.length,
-      hasError: !!localError,
-      isAvailable: isAirtableAvailable,
-      loading: airtableLoading
-    });
-  }, [localInitialized, localSubscribers.length, localError, isAirtableAvailable, airtableLoading]);
-
-  // Synchroniser les états globaux avec les états locaux
-  useEffect(() => {
-    setLocalSubscribers(subscribers);
-    setLocalInitialized(initialized);
-    setLocalError(airtableError);
-  }, [subscribers, initialized, airtableError]);
-
-  // Écouter les mises à jour globales d'Airtable
-  useEffect(() => {
-    const handleAirtableUpdate = (event: CustomEvent) => {
-      console.log('🔄 TicketForm: Mise à jour Airtable reçue:', event.detail);
-      
-      // Forcer la mise à jour des états avec les données globales
-      setLocalSubscribers(event.detail.subscribers || []);
-      setLocalInitialized(event.detail.initialized || false);
-      setLocalError(event.detail.error || null);
-      
-      // Données pour debug
-      const { subscribers: newSubscribers, count, initialized, error } = event.detail;
-      console.log('🔄 TicketForm: Application des nouvelles données:', {
-        newCount: count,
-        currentCount: subscribers.length,
-        newInitialized: initialized,
-        currentInitialized: initialized
-      });
-      
-      // Forcer un re-render complet du composant
-      setLocalForceUpdate(prev => prev + 1);
-      
-      // Vérification post-mise à jour
-      setTimeout(() => {
-        console.log('🔍 TicketForm: Vérification post-mise à jour:', {
-          subscribersLength: subscribers.length,
-          initialized,
-          hasError: !!airtableError,
-          isAvailable: initialized && subscribers.length > 0 && !airtableError,
-          localForceUpdate
-        });
-      }, 100);
-    };
-
-    window.addEventListener('airtable-data-updated', handleAirtableUpdate as EventListener);
-    return () => {
-      window.removeEventListener('airtable-data-updated', handleAirtableUpdate as EventListener);
-    };
-  }, [localForceUpdate]);
+    if (initialized && subscribers.length === 0 && !subscribersError) {
+      console.log('🔄 Aucun abonné trouvé, synchronisation automatique avec Airtable...');
+      handleSyncFromAirtable();
+    }
+  }, [initialized, subscribers.length, subscribersError]);
 
   // Filtrer les abonnés selon le terme de recherche
   useEffect(() => {
     if (!searchTerm.trim()) {
-      setFilteredSubscribers(localSubscribers);
+      setFilteredSubscribers(subscribers);
     } else {
-      const filtered = localSubscribers.filter(subscriber => {
+      const filtered = subscribers.filter(subscriber => {
         const fullName = `${subscriber.prenom} ${subscriber.nom}`.toLowerCase();
-        const contract = subscriber.contratAbonne.toLowerCase();
+        const contract = subscriber.contrat_abonne.toLowerCase();
         const email = subscriber.email?.toLowerCase() || '';
-        const company = subscriber.nomEntreprise?.toLowerCase() || '';
+        const company = subscriber.nom_entreprise?.toLowerCase() || '';
         const search = searchTerm.toLowerCase();
         
         return fullName.includes(search) || 
@@ -122,21 +67,26 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
       });
       setFilteredSubscribers(filtered);
     }
-  }, [searchTerm, localSubscribers]);
+  }, [searchTerm, subscribers]);
 
-  useEffect(() => {
-    console.log('TicketForm: Chargement des abonnés...');
-    console.log('- Abonnés disponibles:', localSubscribers.length);
-    console.log('- Airtable initialisé:', localInitialized);
-    console.log('- Erreur Airtable:', localError);
-  }, [localSubscribers, localInitialized, localError]);
+  const handleSyncFromAirtable = async () => {
+    setSyncing(true);
+    try {
+      await syncFromAirtable();
+      console.log('✅ Synchronisation Airtable terminée');
+    } catch (error) {
+      console.error('❌ Erreur lors de la synchronisation:', error);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const handleSubscriberSelect = (subscriber: any) => {
     setSelectedSubscriber(subscriber.id);
-    setSearchTerm(`${subscriber.prenom} ${subscriber.nom} - ${subscriber.contratAbonne}`);
+    setSearchTerm(`${subscriber.prenom} ${subscriber.nom} - ${subscriber.contrat_abonne}`);
     setFormData(prev => ({
       ...prev,
-      subscriberId: `${subscriber.prenom} ${subscriber.nom} - ${subscriber.contratAbonne}`
+      subscriberId: `${subscriber.prenom} ${subscriber.nom} - ${subscriber.contrat_abonne}`
     }));
     setShowDropdown(false);
     setIsManualEntry(false);
@@ -181,12 +131,12 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
       return;
     }
 
-    if (!isManualEntry && !selectedSubscriber && isAirtableAvailable) {
+    if (!isManualEntry && !selectedSubscriber && isSubscribersAvailable) {
       alert('Veuillez sélectionner un abonné');
       return;
     }
 
-    if ((isManualEntry || !isAirtableAvailable) && !formData.subscriberId.trim()) {
+    if ((isManualEntry || !isSubscribersAvailable) && !formData.subscriberId.trim()) {
       alert('Veuillez remplir les informations de l\'abonné');
       return;
     }
@@ -265,14 +215,26 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
             {/* Sélection du client */}
             <div className="space-y-4">
               <label className="block text-sm font-medium text-gray-700">
-                Abonné *
+                <div className="flex items-center justify-between">
+                  <span>Abonné *</span>
+                  {isSubscribersAvailable && (
+                    <button
+                      type="button"
+                      onClick={handleSyncFromAirtable}
+                      disabled={syncing}
+                      className="text-xs text-orange-600 hover:text-orange-700 underline disabled:opacity-50"
+                    >
+                      {syncing ? '🔄 Synchronisation...' : '🔄 Synchroniser avec Airtable'}
+                    </button>
+                  )}
+                </div>
               </label>
               
-              {isAirtableAvailable ? (
+              {isSubscribersAvailable ? (
                 <div className="space-y-3">
                   <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
                     <p className="text-sm text-green-800">
-                      ✅ {localSubscribers.length} abonnés disponibles depuis Airtable
+                      ✅ {subscribers.length} abonnés disponibles depuis Supabase
                     </p>
                   </div>
                   
@@ -305,9 +267,9 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
                                 {subscriber.prenom} {subscriber.nom}
                               </div>
                               <div className="text-sm text-gray-600">
-                                {subscriber.contratAbonne}
+                                {subscriber.contrat_abonne}
                                 {subscriber.email && ` • ${subscriber.email}`}
-                                {subscriber.nomEntreprise && ` • ${subscriber.nomEntreprise}`}
+                                {subscriber.nom_entreprise && ` • ${subscriber.nom_entreprise}`}
                               </div>
                             </button>
                           ))}
@@ -344,203 +306,4 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
                     <span className="font-medium">Mode saisie manuelle</span>
                   </div>
                   <p className="text-sm text-yellow-700">
-                    Airtable non disponible ({localError || 'Configuration manquante'}). Saisissez manuellement les informations de l'abonné.
-                  </p>
-                  <p className="text-xs text-yellow-600 mt-1">
-                    Abonnés chargés: {localSubscribers.length} | Initialisé: {localInitialized ? 'Oui' : 'Non'}
-                  </p>
-                </div>
-              )}
-
-              {/* Saisie manuelle ou Airtable non disponible */}
-              {(isManualEntry || !isAirtableAvailable) && (
-                <div>
-                  <div className="space-y-3">
-                    {isAirtableAvailable && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsManualEntry(false);
-                          setSearchTerm('');
-                          setFormData(prev => ({ ...prev, subscriberId: '' }));
-                        }}
-                        className="text-sm text-orange-600 hover:text-orange-700 underline"
-                      >
-                        ← Retour à la recherche d'abonnés
-                      </button>
-                    )}
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        <User className="w-4 h-4 inline mr-1" />
-                        Nom de l'abonné *
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.subscriberId}
-                        onChange={(e) => setFormData(prev => ({ ...prev, subscriberId: e.target.value }))}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-                        placeholder="Nom de l'abonné ou numéro de contrat"
-                        required
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Titre */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Titre du ticket *
-              </label>
-              <input
-                type="text"
-                value={formData.title}
-                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                placeholder="Résumé du problème"
-                required
-              />
-            </div>
-
-            {/* Description */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Description *
-              </label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                rows={4}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none"
-                placeholder="Décrivez le problème en détail..."
-                required
-              />
-            </div>
-
-            {/* Priorité et Assignation */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Priorité
-                </label>
-                <div className="relative">
-                  <select
-                    value={formData.priority}
-                    onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value as 'Haute' | 'Moyenne' | 'Basse' }))}
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors appearance-none ${getPriorityColor(formData.priority)}`}
-                  >
-                    <option value="Basse">Faible</option>
-                    <option value="Moyenne">Moyenne</option>
-                    <option value="Haute">Élevée</option>
-                  </select>
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                    {getPriorityIcon(formData.priority)}
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Assigner à
-                </label>
-                <select
-                  value={formData.assignedTo}
-                  onChange={(e) => setFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                >
-                  <option value="">Non assigné</option>
-                  {users.map((user) => (
-                    <option key={user.id} value={user.id}>
-                     {user.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Type et Canal d'entrée */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Type de ticket *
-                </label>
-                <select
-                  value={formData.type}
-                  onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as any }))}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-                  required
-                >
-                  <option value="SAV / question technique">SAV / question technique</option>
-                  <option value="Recouvrement">Recouvrement</option>
-                  <option value="Plainte Installateur">Plainte Installateur</option>
-                  <option value="changement date prélèvement/RIB">Changement date prélèvement/RIB</option>
-                  <option value="Résiliation anticipée / cession de contrat">Résiliation anticipée / cession de contrat</option>
-                  <option value="Ajout contrat / Flexibilité">Ajout contrat / Flexibilité</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Canal d'entrée *
-                </label>
-                <select
-                  value={formData.channel}
-                  onChange={(e) => setFormData(prev => ({ ...prev, channel: e.target.value as any }))}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-                  required
-                >
-                  <option value="Formulaire de contact">Formulaire de contact</option>
-                  <option value="Mail">Mail</option>
-                  <option value="Téléphone">Téléphone</option>
-                  <option value="Site abonné">Site abonné</option>
-                  <option value="Application SunLib">Application SunLib</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Origine */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Origine *
-              </label>
-              <select
-                value={formData.origin}
-                onChange={(e) => setFormData(prev => ({ ...prev, origin: e.target.value as any }))}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-                required
-              >
-                <option value="SunLib">SunLib</option>
-                <option value="Abonné">Abonné</option>
-                <option value="Installateur">Installateur</option>
-              </select>
-            </div>
-            {/* Bouton de soumission */}
-            <div className="flex justify-end pt-4">
-              <button
-                type="submit"
-                disabled={createLoading}
-                className="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {createLoading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Création...
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-4 h-4" />
-                    Créer le ticket
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default TicketForm;
+                    Abonnés non disponibles ({subscribersError || 'Chargement en cours'}). S

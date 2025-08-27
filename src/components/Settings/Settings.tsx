@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { Settings as SettingsIcon, Database, Users, Mail, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
-import { useAirtable } from '../../hooks/useAirtable';
+import { useSupabaseSubscribers } from '../../hooks/useSupabaseSubscribers';
 
 const Settings: React.FC = () => {
-  const { subscribers, loading, error, loadData } = useAirtable();
+  const { subscribers, loading, error, syncFromAirtable } = useSupabaseSubscribers();
   const [testingConnection, setTestingConnection] = useState(false);
 
   const handleTestConnection = async () => {
     setTestingConnection(true);
     try {
-      await loadData();
+      await syncFromAirtable();
     } finally {
       setTestingConnection(false);
     }
@@ -27,7 +27,7 @@ const Settings: React.FC = () => {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900 flex items-center">
             <Database className="w-5 h-5 mr-2 text-orange-500" />
-            Diagnostic Airtable
+            Synchronisation Airtable → Supabase
           </h2>
           <button
             onClick={handleTestConnection}
@@ -35,7 +35,7 @@ const Settings: React.FC = () => {
             className="flex items-center px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${testingConnection ? 'animate-spin' : ''}`} />
-            {testingConnection ? 'Test...' : 'Tester la connexion'}
+            {testingConnection ? 'Synchronisation...' : 'Synchroniser maintenant'}
           </button>
         </div>
 
@@ -45,9 +45,9 @@ const Settings: React.FC = () => {
             <div className="flex items-center">
               <Users className="w-5 h-5 mr-3 text-gray-600" />
               <div>
-                <p className="font-medium text-gray-900">Base de données Abonnés</p>
+                <p className="font-medium text-gray-900">Abonnés Supabase</p>
                 <p className="text-sm text-gray-600">
-                  {subscribers.length} abonnés chargés
+                  {subscribers.length} abonnés synchronisés
                 </p>
               </div>
             </div>
@@ -78,17 +78,16 @@ const Settings: React.FC = () => {
                 <AlertCircle className="w-5 h-5 text-red-500 mr-3 mt-0.5" />
                 <div>
                   <h3 className="text-sm font-medium text-red-800 mb-2">
-                    Problème de connexion Airtable
+                    Problème de synchronisation
                   </h3>
                   <p className="text-sm text-red-700 mb-3">{error}</p>
                   
                   <div className="text-xs text-red-600 space-y-1">
                     <p><strong>Solutions possibles :</strong></p>
                     <ul className="list-disc list-inside space-y-1 ml-2">
-                      <li>Vérifiez que les variables VITE_AIRTABLE_API_KEY et VITE_AIRTABLE_SUBSCRIBERS_BASE_ID sont configurées dans Vercel</li>
-                      <li>Vérifiez que la clé API Airtable est valide et a les bonnes permissions</li>
-                      <li>Vérifiez que l'ID de la base Airtable est correct</li>
-                      <li>Redéployez l'application après avoir modifié les variables d'environnement</li>
+                      <li>Vérifiez la connexion à Supabase</li>
+                      <li>Vérifiez que la fonction Edge de synchronisation est déployée</li>
+                      <li>Vérifiez les variables d'environnement Airtable dans Supabase</li>
                     </ul>
                   </div>
                 </div>
@@ -124,12 +123,12 @@ const Settings: React.FC = () => {
           {subscribers.length > 0 && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <h3 className="text-sm font-medium text-green-800 mb-2">
-                ✅ Connexion Airtable réussie
+                ✅ Synchronisation réussie
               </h3>
               <div className="text-sm text-green-700">
-                <p><strong>{subscribers.length}</strong> abonnés disponibles dans le système</p>
+                <p><strong>{subscribers.length}</strong> abonnés synchronisés depuis Airtable</p>
                 <p className="text-xs mt-1">
-                  Les utilisateurs peuvent maintenant sélectionner des clients depuis la base Airtable
+                  Les utilisateurs peuvent maintenant sélectionner des clients depuis Supabase
                 </p>
               </div>
             </div>
