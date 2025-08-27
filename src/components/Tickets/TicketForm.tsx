@@ -159,6 +159,11 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
               
               {isAirtableAvailable ? (
                 <div className="space-y-3">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
+                    <p className="text-sm text-green-800">
+                      ✅ {subscribers.length} abonnés disponibles depuis Airtable
+                    </p>
+                  </div>
                   <select
                     value={selectedSubscriber || (isManualEntry ? 'manual' : '')}
                     onChange={(e) => handleSubscriberChange(e.target.value)}
@@ -169,6 +174,7 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
                     {subscribers.map((subscriber) => (
                       <option key={subscriber.id} value={subscriber.id}>
                         {subscriber.prenom} {subscriber.nom} - {subscriber.contratAbonne}
+                        {subscriber.email && ` (${subscriber.email})`}
                       </option>
                     ))}
                     <option value="manual">➕ Saisie manuelle</option>
@@ -181,42 +187,29 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
                     <span className="font-medium">Mode saisie manuelle</span>
                   </div>
                   <p className="text-sm text-yellow-700">
-                    Saisissez manuellement les informations de l'abonné
+                    Airtable non disponible ({airtableError || 'Configuration manquante'}). Saisissez manuellement les informations de l'abonné.
+                  </p>
+                  <p className="text-xs text-yellow-600 mt-1">
+                    Abonnés chargés: {subscribers.length} | Initialisé: {initialized ? 'Oui' : 'Non'}
                   </p>
                 </div>
               )}
 
               {/* Saisie manuelle ou Airtable non disponible */}
               {(isManualEntry || !isAirtableAvailable) && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      <User className="w-4 h-4 inline mr-1" />
-                      Nom du client *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.clientName}
-                      onChange={(e) => setFormData(prev => ({ ...prev, clientName: e.target.value }))}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                      placeholder="Nom complet du client"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      <Mail className="w-4 h-4 inline mr-1" />
-                      Email du client *
-                    </label>
-                    <input
-                      type="email"
-                      value={formData.clientEmail}
-                      onChange={(e) => setFormData(prev => ({ ...prev, clientEmail: e.target.value }))}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                      placeholder="email@exemple.com"
-                      required
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <User className="w-4 h-4 inline mr-1" />
+                    Nom de l'abonné *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.subscriberId}
+                    onChange={(e) => setFormData(prev => ({ ...prev, subscriberId: e.target.value }))}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                    placeholder="Nom de l'abonné ou numéro de contrat"
+                    required
+                  />
                 </div>
               )}
             </div>

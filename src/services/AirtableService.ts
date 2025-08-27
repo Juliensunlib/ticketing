@@ -46,8 +46,9 @@ export default class AirtableService {
       console.log(`📊 Airtable: Récupération de la page ${Math.floor(allRecords.length / 100) + 1}...`);
       console.log(`📊 URL complète: ${this.baseUrl}/Abonnés?${params}`);
       
+      let response: any;
       try {
-        const response = await this.makeRequest(`/Abonnés?${params}`);
+        response = await this.makeRequest(`/Abonnés?${params}`);
         console.log('📊 Réponse reçue:', {
           recordsCount: response.records?.length || 0,
           hasOffset: !!response.offset,
