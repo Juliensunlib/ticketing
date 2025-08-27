@@ -168,7 +168,9 @@ Priorité: ${currentTicket.priority}`;
 
   // Fonction pour détecter automatiquement l'email de l'abonné
   const detectSubscriberEmail = () => {
-    console.log('🔍 Recherche email pour abonné:', currentTicket.subscriberId);
+    console.log('🔍 === DÉTECTION EMAIL AUTOMATIQUE ===');
+    console.log('🔍 Abonné recherché:', currentTicket.subscriberId);
+    console.log('🔍 Nombre d\'abonnés Airtable disponibles:', subscribers.length);
     
     // 1. D'abord, chercher un email directement dans le subscriberId (format "Nom <email@domain.com>")
     const emailInSubscriberIdMatch = currentTicket.subscriberId?.match(/<([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})>/);
@@ -176,6 +178,7 @@ Priorité: ${currentTicket.priority}`;
       console.log('✅ Email trouvé dans subscriberId (format <email>):', emailInSubscriberIdMatch[1]);
       return emailInSubscriberIdMatch[1];
     }
+    console.log('❌ Pas d\'email trouvé au format <email>');
     
     // 2. Si pas trouvé, chercher un email simple dans le subscriberId
     const emailMatch = currentTicket.subscriberId?.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
@@ -183,9 +186,17 @@ Priorité: ${currentTicket.priority}`;
       console.log('✅ Email trouvé dans subscriberId (format simple):', emailMatch[1]);
       return emailMatch[1];
     }
+    console.log('❌ Pas d\'email trouvé au format simple');
     
     // 3. Si toujours pas trouvé, chercher dans les abonnés Airtable
     console.log('🔍 Recherche dans Airtable...');
+    console.log('🔍 Abonnés disponibles:', subscribers.map(s => ({ 
+      nom: s.nom, 
+      prenom: s.prenom, 
+      contrat: s.contratAbonne, 
+      email: s.email 
+    })));
+    
     const subscriber = subscribers.find(sub => 
       currentTicket.subscriberId?.includes(sub.contratAbonne) || 
       currentTicket.subscriberId?.includes(`${sub.prenom} ${sub.nom}`) ||
@@ -195,10 +206,18 @@ Priorité: ${currentTicket.priority}`;
     
     if (subscriber?.email) {
       console.log('✅ Email trouvé dans Airtable:', subscriber.email);
+      console.log('✅ Abonné trouvé:', subscriber);
       return subscriber.email;
     }
     
+    if (subscriber) {
+      console.log('⚠️ Abonné trouvé mais sans email:', subscriber);
+    } else {
+      console.log('❌ Aucun abonné correspondant trouvé');
+    }
+    
     console.log('❌ Aucun email trouvé pour:', currentTicket.subscriberId);
+    console.log('🔍 === FIN DÉTECTION ===');
     return '';
   };
 
@@ -490,7 +509,13 @@ Priorité: ${currentTicket.priority}`;
                             type="button"
                             onClick={() => {
                               const detectedEmail = detectSubscriberEmail();
-                              setEmailRecipient(detectedEmail);
+                              if (detectedEmail) {
+                                setEmailRecipient(detectedEmail);
+                                console.log('✅ Email mis à jour:', detectedEmail);
+                              } else {
+                                console.log('❌ Aucun email détecté, conservation de l\'email actuel');
+                                alert('Aucun email automatique trouvé. Vérifiez que l\'abonné a un email dans Airtable ou saisissez l\'email manuellement.');
+                              }
                             }}
                             className="px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition-colors text-sm"
                             title="Détecter automatiquement l'email"
