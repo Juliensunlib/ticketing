@@ -95,6 +95,13 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose }) => {
     if (!newComment.trim()) return;
 
     try {
+      // Vérifier l'authentification Gmail avant d'envoyer
+      if (!gmailService.isAuthenticated()) {
+        alert('Vous devez être connecté à Gmail pour envoyer des emails. Allez dans l\'onglet "Emails Abonnés" pour vous connecter.');
+        setSendingComment(false);
+        return;
+      }
+
       // Extraire l'email de l'abonné depuis le subscriberId
       const emailMatch = currentTicket.subscriberId?.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
       const subscriberEmail = emailMatch ? emailMatch[1] : null;
@@ -159,7 +166,21 @@ Priorité: ${currentTicket.priority}`;
       
     } catch (error) {
       console.error('Erreur envoi email:', error);
-      alert('Erreur lors de l\'envoi de l\'email. Vérifiez que vous êtes connecté à Gmail.');
+      
+      // Messages d'erreur plus spécifiques
+      if (error instanceof Error) {
+        if (error.message === 'NEED_AUTH') {
+          alert('Session Gmail expirée. Allez dans l\'onglet "Emails Abonnés" pour vous reconnecter.');
+        } else if (error.message.includes('401')) {
+          alert('Session Gmail expirée. Allez dans l\'onglet "Emails Abonnés" pour vous reconnecter.');
+        } else if (error.message.includes('Failed to fetch')) {
+          alert('Impossible de se connecter à Gmail. Vérifiez votre connexion internet.');
+        } else {
+          alert(`Erreur lors de l'envoi de l'email: ${error.message}`);
+        }
+      } else {
+        alert('Erreur lors de l\'envoi de l\'email. Vérifiez que vous êtes connecté à Gmail.');
+      }
     } finally {
       setSendingComment(false);
     }
