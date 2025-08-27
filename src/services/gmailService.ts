@@ -321,6 +321,57 @@ class GmailService {
     }
   }
 
+  async sendEmail(to: string, subject: string, body: string): Promise<void> {
+    try {
+      console.log('📤 Envoi d\'un nouvel email...');
+      console.log('📧 Destinataire:', to);
+      console.log('📧 Sujet:', subject);
+      
+      // Construire l'email
+      const emailContent = [
+        `To: ${to}`,
+        `Subject: ${subject}`,
+        `Content-Type: text/plain; charset=utf-8`,
+        '',
+        body
+      ].join('\n');
+
+      // Encoder en base64url (format requis par Gmail)
+      const encodedMessage = btoa(unescape(encodeURIComponent(emailContent)))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+
+      console.log('📤 Envoi via Gmail API...');
+      
+      // Envoyer l'email
+      const response = await this.makeGmailRequest('messages/send', 'POST', {
+        raw: encodedMessage
+      });
+
+      console.log('✅ Email envoyé avec succès:', response);
+    } catch (error) {
+      console.error('❌ Erreur lors de l\'envoi de l\'email:', error);
+      
+      // Améliorer les messages d'erreur
+      if (error instanceof Error) {
+        if (error.message.includes('400')) {
+          throw new Error('Format d\'email invalide. Vérifiez l\'adresse email du destinataire.');
+        } else if (error.message.includes('403')) {
+          throw new Error('Permissions insuffisantes. Vérifiez que votre compte Gmail a les droits d\'envoi.');
+        } else if (error.message.includes('429')) {
+          throw new Error('Limite de taux dépassée. Attendez quelques minutes avant de réessayer.');
+        } else if (error.message.includes('NEED_AUTH')) {
+          throw new Error('Session expirée. Reconnectez-vous à Gmail.');
+        } else {
+          throw new Error(`Erreur Gmail: ${error.message}`);
+        }
+      }
+      
+      throw error;
+    }
+  }
+
   private parseMessage(message: GmailMessage): any {
     const headers = message.payload.headers;
     const subject = headers.find(h => h.name === 'Subject')?.value || 'Sans sujet';

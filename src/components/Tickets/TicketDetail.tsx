@@ -148,13 +148,11 @@ Ticket #${currentTicket.id} - ${currentTicket.title}
 Statut: ${currentTicket.status}
 Priorité: ${currentTicket.priority}`;
 
-      // Envoyer l'email via Gmail
-      await gmailService.sendReply(
-        currentTicket.id, // Utiliser l'ID du ticket comme référence
-        finalEmail,
-        subject,
-        emailBody
-      );
+      console.log('📧 Envoi email vers:', finalEmail);
+      console.log('📧 Sujet:', subject);
+      
+      // Envoyer l'email via Gmail (nouveau email, pas une réponse)
+      await gmailService.sendEmail(finalEmail, subject, emailBody);
       
       // Ajouter aussi un commentaire au ticket
       await addComment(currentTicket.id, `📧 Email envoyé à ${finalEmail} :\n\nSujet: ${subject}\n\n${newComment}`);
@@ -169,15 +167,7 @@ Priorité: ${currentTicket.priority}`;
       
       // Messages d'erreur plus spécifiques
       if (error instanceof Error) {
-        if (error.message === 'NEED_AUTH') {
-          alert('Session Gmail expirée. Allez dans l\'onglet "Emails Abonnés" pour vous reconnecter.');
-        } else if (error.message.includes('401')) {
-          alert('Session Gmail expirée. Allez dans l\'onglet "Emails Abonnés" pour vous reconnecter.');
-        } else if (error.message.includes('Failed to fetch')) {
-          alert('Impossible de se connecter à Gmail. Vérifiez votre connexion internet.');
-        } else {
-          alert(`Erreur lors de l'envoi de l'email: ${error.message}`);
-        }
+        alert(`Erreur lors de l'envoi de l'email: ${error.message}`);
       } else {
         alert('Erreur lors de l\'envoi de l\'email. Vérifiez que vous êtes connecté à Gmail.');
       }
