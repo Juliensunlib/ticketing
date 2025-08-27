@@ -39,6 +39,17 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
   // Vérifier si Airtable est disponible
   const isAirtableAvailable = initialized && subscribers.length > 0 && !airtableError;
 
+  // Debug pour voir l'état en temps réel
+  useEffect(() => {
+    console.log('🔍 TicketForm - État Airtable:', {
+      initialized,
+      subscribersCount: subscribers.length,
+      hasError: !!airtableError,
+      isAvailable: isAirtableAvailable,
+      loading: airtableLoading
+    });
+  }, [initialized, subscribers.length, airtableError, isAirtableAvailable, airtableLoading]);
+
   // Filtrer les abonnés selon le terme de recherche
   useEffect(() => {
     if (!searchTerm.trim()) {

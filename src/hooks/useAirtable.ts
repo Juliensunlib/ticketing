@@ -50,6 +50,7 @@ export const useAirtable = () => {
   useEffect(() => {
     // Si déjà initialisé globalement, utiliser les données en cache
     if (globalInitialized) {
+      console.log('📋 useAirtable: Utilisation du cache global -', globalSubscribers.length, 'abonnés');
       setSubscribers(globalSubscribers);
       setLoading(globalLoading);
       setError(globalError);
@@ -67,6 +68,7 @@ export const useAirtable = () => {
     
     const config = getAirtableConfig();
     
+        console.log('🔄 useAirtable: Synchronisation détectée -', globalSubscribers.length, 'abonnés');
     if (config) {
       if (!airtableServiceInstance) {
         console.log('✅ useAirtable: Création du service Airtable');
@@ -111,6 +113,8 @@ export const useAirtable = () => {
       setError(null);
       setLoading(false);
       setInitialized(true);
+      
+      console.log('✅ useAirtable: Données synchronisées - Abonnés:', subscribersData.length);
     } catch (err) {
       console.error('❌ Erreur Airtable:', err);
       const errorMessage = `Erreur de chargement Airtable: ${err instanceof Error ? err.message : 'Erreur inconnue'}`;
