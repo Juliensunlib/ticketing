@@ -37,11 +37,9 @@ export const useAirtable = () => {
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    const config = getAirtableConfig();
-    if (config) {
       console.log('✅ Configuration Airtable trouvée, chargement des données...');
-      const service = new AirtableService(config.apiKey, config.subscribersBaseId);
-      setAirtableService(service);
+      console.log('✅ Configuration Airtable trouvée, chargement des données...');
+      console.log('✅ Configuration Airtable trouvée, chargement des données...');
       // Charger les données en arrière-plan sans bloquer l'interface
       loadDataWithService(service).catch((error) => {
         console.error('Erreur lors du chargement initial des données Airtable:', error);
@@ -51,9 +49,6 @@ export const useAirtable = () => {
         setInitialized(true);
       });
     } else {
-      setInitialized(true);
-    }
-    
     // Timeout de sécurité pour éviter le blocage
     const timeout = setTimeout(() => {
       if (!initialized) {
@@ -65,9 +60,6 @@ export const useAirtable = () => {
     
     return () => clearTimeout(timeout);
   }, []);
-
-  const loadDataWithService = async (service: AirtableService) => {
-    console.log('🔄 useAirtable: Chargement des données...');
     setLoading(true);
     setError(null);
     
@@ -75,12 +67,14 @@ export const useAirtable = () => {
       let subscribersData: Subscriber[] = [];
 
       try {
+        console.log('📋 Récupération des abonnés...');
         console.log('🔄 Chargement des abonnés Airtable...');
         subscribersData = await service.getSubscribers();
+        console.log(`✅ ${subscribersData.length} abonnés récupérés avec succès`);
         console.log('✅ Abonnés chargés:', subscribersData.length);
       } catch (err) {
         console.error('❌ Erreur Airtable:', err);
-        setError(`Erreur de chargement Airtable: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
+        setError(`ERREUR CRITIQUE Airtable: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
         // Airtable non disponible - continuer avec tableau vide
       }
 
@@ -88,7 +82,7 @@ export const useAirtable = () => {
       
     } catch (err) {
       console.error('❌ Erreur générale lors du chargement:', err);
-      setError(`Erreur générale: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
+      setError(`ERREUR GÉNÉRALE: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
     } finally {
       setLoading(false);
     }
