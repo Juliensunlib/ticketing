@@ -38,66 +38,67 @@ export const useAirtable = () => {
 
   useEffect(() => {
     const config = getAirtableConfig();
-    const service = config ? new AirtableService(config.apiKey, config.subscribersBaseId) : null;
-    
-    const loadDataWithService = async (service: AirtableService) => {
-      console.log('✅ Configuration Airtable trouvée, chargement des données...');
-      setLoading(true);
-      setError(null);
-      
-      try {
-        let subscribersData: Subscriber[] = [];
-
-        try {
-          console.log('🔄 Chargement des abonnés Airtable...');
-          subscribersData = await service.getSubscribers();
-          console.log('✅ Abonnés chargés:', subscribersData.length);
-        } catch (err) {
-          console.error('❌ Erreur Airtable:', err);
-          setError(`Erreur Airtable: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
-          // Airtable non disponible - continuer avec tableau vide
-        }
-
-        setSubscribers(subscribersData);
-        
-      } catch (err) {
-        console.error('❌ Erreur générale lors du chargement:', err);
-        setError(`Erreur générale: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     if (config) {
-      console.log('🚀 Initialisation du service Airtable...');
       console.log('✅ Configuration Airtable trouvée, chargement des données...');
+      const service = new AirtableService(config.apiKey, config.subscribersBaseId);
       setAirtableService(service);
       // Charger les données en arrière-plan sans bloquer l'interface
       loadDataWithService(service).catch((error) => {
         console.error('Erreur lors du chargement initial des données Airtable:', error);
         // Ne pas bloquer l'interface même en cas d'erreur
-        setError(`ERREUR CRITIQUE Airtable: ${error.message}`);
+        setError(`Connexion Airtable impossible: ${error.message}`);
       }).finally(() => {
         setInitialized(true);
       });
     } else {
-      console.warn('⚠️ Airtable non configuré - Mode saisie manuelle uniquement');
-      setError('Configuration Airtable manquante. Vérifiez les variables d\'environnement VITE_AIRTABLE_API_KEY et VITE_AIRTABLE_SUBSCRIBERS_BASE_ID dans votre fichier .env\n💡 Vérifiez que les variables VITE_AIRTABLE_API_KEY et VITE_AIRTABLE_SUBSCRIBERS_BASE_ID sont configurées dans votre fichier .env');
       setInitialized(true);
     }
+    
     // Timeout de sécurité pour éviter le blocage
     const timeout = setTimeout(() => {
-      console.error('❌ Configuration Airtable invalide ou manquante');
+      if (!initialized) {
+        console.warn('⚠️ Timeout d\'initialisation Airtable, déblocage forcé');
+        setInitialized(true);
+        setLoading(false);
+      }
     }, 5000); // 5 secondes maximum
     
     return () => clearTimeout(timeout);
   }, []);
 
+  const loadDataWithService = async (service: AirtableService) => {
+    console.log('🔄 useAirtable: Chargement des données...');
+    setLoading(true);
+    setError(null);
+    
+    try {
+      let subscribersData: Subscriber[] = [];
+
+      try {
+        console.log('🔄 Chargement des abonnés Airtable...');
+        subscribersData = await service.getSubscribers();
+        console.log('✅ Abonnés chargés:', subscribersData.length);
+      } catch (err) {
+        console.error('❌ Erreur Airtable:', err);
+        setError(`Erreur de chargement Airtable: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
+        // Airtable non disponible - continuer avec tableau vide
+      }
+
+      setSubscribers(subscribersData);
+      
+    } catch (err) {
+      console.error('❌ Erreur générale lors du chargement:', err);
+      setError(`Erreur générale: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const loadData = async () => {
     console.log('🔄 useAirtable: Rechargement manuel des données...');
     if (!airtableService) {
-      console.warn('⚠️ Service Airtable non initialisé');
-      setError('Configuration Airtable manquante. Vérifiez les variables d\'environnement VITE_AIRTABLE_API_KEY et VITE_AIRTABLE_SUBSCRIBERS_BASE_ID dans votre fichier .env\n💡 Vérifiez que les variables VITE_AIRTABLE_API_KEY et VITE_AIRTABLE_SUBSCRIBERS_BASE_ID sont configurées dans votre fichier .env');
+      console.warn('⚠️ Service Airtable non initialisé. Vérifiez la configuration dans le fichier .env');
+      setError('Configuration Airtable manquante. Vérifiez les variables d\'environnement VITE_AIRTABLE_API_KEY et VITE_AIRTABLE_SUBSCRIBERS_BASE_ID dans votre fichier .env');
       return;
     }
 
@@ -116,7 +117,7 @@ export const useAirtable = () => {
     } catch (err) {
       console.error('Erreur lors du chargement des données Airtable:', err);
       if (err instanceof Error && err.message.includes('Failed to fetch')) {
-        setError('Connexion à Airtable impossible. Vérifiez votre connexion internet et les variables d\'environnement.');
+        setError('Connexion à Airtable impossible. Contactez l\'administrateur si le problème persiste.');
       } else {
         setError(`Erreur lors du rechargement: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
       }
@@ -156,8 +157,6 @@ export const useAirtable = () => {
       return null;
     }
   };
-
-  console.log('✅ Configuration Airtable valide');
 
   return {
     subscribers,
