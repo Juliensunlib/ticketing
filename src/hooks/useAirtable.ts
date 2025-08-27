@@ -7,25 +7,35 @@ const getAirtableConfig = () => {
   const apiKey = import.meta.env.VITE_AIRTABLE_API_KEY;
   const subscribersBaseId = import.meta.env.VITE_AIRTABLE_SUBSCRIBERS_BASE_ID;
 
-  // Logs uniquement en mode développement et si les variables sont définies
-  if (import.meta.env.DEV && (apiKey || subscribersBaseId)) {
-    console.log('🔍 Configuration Airtable:');
-    console.log('- API Key:', apiKey ? `${apiKey.substring(0, 8)}...` : 'MANQUANTE');
-    console.log('- Base ID:', subscribersBaseId || 'MANQUANTE');
-  }
+  // Logs détaillés pour diagnostiquer le problème
+  console.log('🔍 === DIAGNOSTIC AIRTABLE ===');
+  console.log('🔍 Mode:', import.meta.env.MODE);
+  console.log('🔍 DEV:', import.meta.env.DEV);
+  console.log('🔍 PROD:', import.meta.env.PROD);
+  console.log('🔍 API Key présente:', !!apiKey);
+  console.log('🔍 API Key longueur:', apiKey?.length || 0);
+  console.log('🔍 API Key début:', apiKey ? `${apiKey.substring(0, 12)}...` : 'MANQUANTE');
+  console.log('🔍 Base ID présente:', !!subscribersBaseId);
+  console.log('🔍 Base ID longueur:', subscribersBaseId?.length || 0);
+  console.log('🔍 Base ID:', subscribersBaseId || 'MANQUANTE');
+  console.log('🔍 === FIN DIAGNOSTIC ===');
 
   if (!apiKey || !subscribersBaseId || 
       apiKey === 'votre_clé_api_airtable' || 
       subscribersBaseId === 'id_de_votre_base_abonnés' ||
       apiKey.trim() === '' || 
       subscribersBaseId.trim() === '') {
-    // Ne pas afficher d'avertissement si on est en production (variables dans Vercel)
-    if (import.meta.env.DEV) {
-      console.info('ℹ️ Configuration Airtable locale non trouvée. Mode saisie manuelle activé.');
-    }
+    console.warn('❌ Configuration Airtable invalide. Raisons possibles:');
+    console.warn('- API Key manquante:', !apiKey);
+    console.warn('- Base ID manquante:', !subscribersBaseId);
+    console.warn('- API Key par défaut:', apiKey === 'votre_clé_api_airtable');
+    console.warn('- Base ID par défaut:', subscribersBaseId === 'id_de_votre_base_abonnés');
+    console.warn('- API Key vide:', apiKey?.trim() === '');
+    console.warn('- Base ID vide:', subscribersBaseId?.trim() === '');
     return null;
   }
 
+  console.log('✅ Configuration Airtable valide trouvée');
   return { apiKey, subscribersBaseId };
 };
 

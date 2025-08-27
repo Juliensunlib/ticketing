@@ -103,11 +103,19 @@ const Settings: React.FC = () => {
             </h3>
             <div className="text-xs text-blue-700 space-y-1">
               <p><strong>Environnement :</strong> {import.meta.env.MODE}</p>
+              <p><strong>URL actuelle :</strong> {window.location.href}</p>
               <p><strong>Variables configurées :</strong></p>
               <ul className="list-disc list-inside ml-2 space-y-1">
-                <li>VITE_AIRTABLE_API_KEY: {import.meta.env.VITE_AIRTABLE_API_KEY ? '✅ Configurée' : '❌ Manquante'}</li>
-                <li>VITE_AIRTABLE_SUBSCRIBERS_BASE_ID: {import.meta.env.VITE_AIRTABLE_SUBSCRIBERS_BASE_ID ? '✅ Configurée' : '❌ Manquante'}</li>
+                <li>VITE_AIRTABLE_API_KEY: {import.meta.env.VITE_AIRTABLE_API_KEY ? `✅ Configurée (${import.meta.env.VITE_AIRTABLE_API_KEY.length} chars)` : '❌ Manquante'}</li>
+                <li>VITE_AIRTABLE_SUBSCRIBERS_BASE_ID: {import.meta.env.VITE_AIRTABLE_SUBSCRIBERS_BASE_ID ? `✅ Configurée (${import.meta.env.VITE_AIRTABLE_SUBSCRIBERS_BASE_ID})` : '❌ Manquante'}</li>
                 <li>VITE_SUPABASE_URL: {import.meta.env.VITE_SUPABASE_URL ? '✅ Configurée' : '❌ Manquante'}</li>
+              </ul>
+              <p><strong>Debug Airtable :</strong></p>
+              <ul className="list-disc list-inside ml-2 space-y-1">
+                <li>Abonnés chargés: {subscribers.length}</li>
+                <li>Erreur: {error || 'Aucune'}</li>
+                <li>Initialisé: {initialized ? 'Oui' : 'Non'}</li>
+                <li>En cours de chargement: {loading ? 'Oui' : 'Non'}</li>
               </ul>
             </div>
           </div>

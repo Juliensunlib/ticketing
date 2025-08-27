@@ -31,6 +31,8 @@ export default class AirtableService {
 
   async getSubscribers(): Promise<Subscriber[]> {
     console.log('🔄 AirtableService: Récupération des abonnés...');
+    console.log('🔍 URL de base:', this.baseUrl);
+    console.log('🔍 API Key (début):', this.apiKey.substring(0, 12) + '...');
     
     let allRecords: any[] = [];
     let offset: string | undefined;
@@ -42,11 +44,26 @@ export default class AirtableService {
       });
       
       console.log(`📊 Airtable: Récupération de la page ${Math.floor(allRecords.length / 100) + 1}...`);
+      console.log(`📊 URL complète: ${this.baseUrl}/Abonnés?${params}`);
       
-      const response = await this.makeRequest(`/Abonnés?${params}`);
+      try {
+        const response = await this.makeRequest(`/Abonnés?${params}`);
+        console.log('📊 Réponse reçue:', {
+          recordsCount: response.records?.length || 0,
+          hasOffset: !!response.offset,
+          firstRecord: response.records?.[0]?.fields || 'Aucun'
+        });
       
-      allRecords = [...allRecords, ...response.records];
-      offset = response.offset;
+        allRecords = [...allRecords, ...response.records];
+        offset = response.offset;
+      } catch (error) {
+        console.error('❌ Erreur lors de la requête Airtable:', error);
+        console.error('❌ Détails de l\'erreur:', {
+          message: error instanceof Error ? error.message : 'Erreur inconnue',
+          stack: error instanceof Error ? error.stack : 'Pas de stack'
+        });
+        throw error;
+      }
       
       if (response.records.length > 0) {
         console.log(`📊 Airtable: ${allRecords.length} abonnés récupérés jusqu'à présent...`);
@@ -58,11 +75,14 @@ export default class AirtableService {
 
     return allRecords.map((record: any) => ({
       id: record.id,
-      name: record.fields['Nom'] || record.fields['Name'] || 'Nom manquant',
-      email: record.fields['Email'] || record.fields['email'] || '',
-      subscription: record.fields['Abonnement'] || record.fields['Subscription'] || 'Standard',
-      status: record.fields['Statut'] || record.fields['Status'] || 'Actif',
-      createdAt: record.fields['Date de création'] || record.fields['Created'] || record.createdTime,
+      nom: record.fields['Nom'] || record.fields['nom'] || 'Nom manquant',
+      prenom: record.fields['Prénom'] || record.fields['prenom'] || record.fields['Prenom'] || 'Prénom manquant',
+      contratAbonne: record.fields['Contrat abonné'] || record.fields['contrat_abonne'] || record.fields['Contrat'] || record.id,
+      nomEntreprise: record.fields['Nom entreprise'] || record.fields['nom_entreprise'] || record.fields['Entreprise'] || '',
+      installateur: record.fields['Installateur'] || record.fields['installateur'] || '',
+      lienCRM: record.fields['Lien CRM'] || record.fields['lien_crm'] || record.fields['CRM'] || '',
+      email: record.fields['Email'] || record.fields['email'] || record.fields['E-mail'] || '',
+      telephone: record.fields['Téléphone'] || record.fields['telephone'] || record.fields['Tel'] || record.fields['Phone'] || '',
     }));
   }
 
