@@ -129,8 +129,8 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
       return;
     }
 
-    const createTicketAsync = async () => {
-      try {
+    // Créer le ticket
+    try {
       console.log('🎫 Création du ticket depuis email...');
       
       // Préparer les données selon le type d'abonné
@@ -149,19 +149,16 @@ const TicketFormFromEmail: React.FC<TicketFormFromEmailProps> = ({ email, onClos
       
       console.log('🎫 Données du ticket:', ticketData);
       
-      // Créer le ticket
-      const result = await createTicket(ticketData);
-      console.log('✅ Ticket créé:', result);
+      // Créer le ticket (fonction synchrone qui retourne une promesse)
+      createTicket(ticketData);
+      console.log('✅ Ticket créé avec succès');
       
       onSuccess();
       onClose();
-      } catch (error) {
+    } catch (error) {
       console.error('Erreur lors de la création du ticket:', error);
-      setErrors({ general: 'Erreur lors de la création du ticket' });
-      }
-    };
-    
-    createTicketAsync();
+      setErrors({ general: `Erreur lors de la création du ticket: ${error instanceof Error ? error.message : 'Erreur inconnue'}` });
+    }
   };
 
   // Filtrer les abonnés selon la recherche

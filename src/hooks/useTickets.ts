@@ -78,10 +78,10 @@ export const useTickets = () => {
       origin: ticketData.origin,
       channel: ticketData.channel,
       created_by: user.id,
-      assigned_to: ticketData.assignedTo,
+      assigned_to: ticketData.assignedTo || null,
       subscriber_id: ticketData.subscriberId,
       subscriber_name: ticketData.subscriberId, // Le nom complet est déjà dans subscriberId
-      installer_id: ticketData.installerId
+      installer_id: ticketData.installerId || null
     };
 
     console.log('🔍 useTickets.createTicket - Données Supabase:', supabaseTicketData);
