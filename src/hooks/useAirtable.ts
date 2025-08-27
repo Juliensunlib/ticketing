@@ -47,6 +47,32 @@ export const useAirtable = () => {
   const [error, setError] = useState<string | null>(globalError);
   const [initialized, setInitialized] = useState(globalInitialized);
 
+  // Forcer le re-render quand les données globales changent
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (globalSubscribers !== subscribers || 
+          globalLoading !== loading || 
+          globalError !== error || 
+          globalInitialized !== initialized) {
+        
+        console.log('🔄 useAirtable: Synchronisation forcée détectée');
+        console.log('📊 Nouvelles données:', {
+          subscribers: globalSubscribers.length,
+          loading: globalLoading,
+          error: globalError,
+          initialized: globalInitialized
+        });
+        
+        setSubscribers([...globalSubscribers]);
+        setLoading(globalLoading);
+        setError(globalError);
+        setInitialized(globalInitialized);
+      }
+    }, 1000); // Vérifier toutes les secondes
+
+    return () => clearInterval(interval);
+  }, [subscribers, loading, error, initialized]);
+
   useEffect(() => {
     // Si déjà initialisé globalement, utiliser les données en cache
     if (globalInitialized) {
