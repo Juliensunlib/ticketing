@@ -285,12 +285,68 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
               </div>
             </div>
 
+            {/* Type et Canal d'entrée */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Type de ticket *
+                </label>
+                <select
+                  value={formData.type}
+                  onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as any }))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                  required
+                >
+                  <option value="SAV / question technique">SAV / question technique</option>
+                  <option value="Recouvrement">Recouvrement</option>
+                  <option value="Plainte Installateur">Plainte Installateur</option>
+                  <option value="changement date prélèvement/RIB">Changement date prélèvement/RIB</option>
+                  <option value="Résiliation anticipée / cession de contrat">Résiliation anticipée / cession de contrat</option>
+                  <option value="Ajout contrat / Flexibilité">Ajout contrat / Flexibilité</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Canal d'entrée *
+                </label>
+                <select
+                  value={formData.channel}
+                  onChange={(e) => setFormData(prev => ({ ...prev, channel: e.target.value as any }))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                  required
+                >
+                  <option value="Formulaire de contact">Formulaire de contact</option>
+                  <option value="Mail">Mail</option>
+                  <option value="Téléphone">Téléphone</option>
+                  <option value="Site abonné">Site abonné</option>
+                  <option value="Application SunLib">Application SunLib</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Origine */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Origine *
+              </label>
+              <select
+                value={formData.origin}
+                onChange={(e) => setFormData(prev => ({ ...prev, origin: e.target.value as any }))}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                required
+              >
+                <option value="SunLib">SunLib</option>
+                <option value="Abonné">Abonné</option>
+                <option value="Installateur">Installateur</option>
+              </select>
+            </div>
             {/* Bouton de soumission */}
             <div className="flex justify-end pt-4">
               <button
                 type="submit"
                 disabled={createLoading}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {createLoading ? (
                   <>
