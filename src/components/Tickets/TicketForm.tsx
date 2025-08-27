@@ -278,7 +278,7 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
                   <option value="">Non assigné</option>
                   {users.map((user) => (
                     <option key={user.id} value={user.id}>
-                      {user.email}
+                     {user.name}
                     </option>
                   ))}
                 </select>
