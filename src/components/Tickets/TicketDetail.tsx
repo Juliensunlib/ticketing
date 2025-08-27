@@ -21,6 +21,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [commentType, setCommentType] = useState<'comment' | 'email'>('comment');
   const [emailSubject, setEmailSubject] = useState('');
+  const [emailRecipient, setEmailRecipient] = useState('');
   const [sendingComment, setSendingComment] = useState(false);
   const [editData, setEditData] = useState({
     status: ticket.status,
@@ -94,63 +95,27 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket, onClose }) => {
   const handleSendEmailFromComment = async () => {
     if (!newComment.trim()) return;
 
+    // Utiliser l'email saisi manuellement ou celui détecté automatiquement
+    const finalEmail = emailRecipient.trim();
+    
+    if (!finalEmail) {
+      alert('Veuillez saisir une adresse email valide.');
+      setSendingComment(false);
+      return;
+    }
+
+    // Validation basique de l'email
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(finalEmail)) {
+      alert('Format d\'adresse email invalide.');
+      setSendingComment(false);
+      return;
+    }
+
     try {
       // Vérifier l'authentification Gmail avant d'envoyer
       if (!gmailService.isAuthenticated()) {
         alert('Vous devez être connecté à Gmail pour envoyer des emails. Allez dans l\'onglet "Emails Abonnés" pour vous connecter.');
-        setSendingComment(false);
-        return;
-      }
-
-      console.log('🔍 Recherche email pour abonné:', currentTicket.subscriberId);
-      
-      let subscriberEmail = null;
-      
-      // 1. D'abord, chercher un email directement dans le subscriberId (format "Nom <email@domain.com>")
-      const emailInSubscriberIdMatch = currentTicket.subscriberId?.match(/<([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})>/);
-      if (emailInSubscriberIdMatch) {
-        subscriberEmail = emailInSubscriberIdMatch[1];
-        console.log('✅ Email trouvé dans subscriberId (format <email>):', subscriberEmail);
-      }
-      
-      // 2. Si pas trouvé, chercher un email simple dans le subscriberId
-      if (!subscriberEmail) {
-        const emailMatch = currentTicket.subscriberId?.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-        if (emailMatch) {
-          subscriberEmail = emailMatch[1];
-          console.log('✅ Email trouvé dans subscriberId (format simple):', subscriberEmail);
-        }
-      }
-      
-      // 3. Si toujours pas trouvé, chercher dans les abonnés Airtable
-      if (!subscriberEmail) {
-        console.log('🔍 Recherche dans Airtable...');
-        const subscriber = subscribers.find(sub => 
-          currentTicket.subscriberId?.includes(sub.contratAbonne) || 
-          currentTicket.subscriberId?.includes(`${sub.prenom} ${sub.nom}`) ||
-          currentTicket.subscriberId?.includes(sub.nom) ||
-          currentTicket.subscriberId?.includes(sub.prenom)
-        );
-        
-        if (subscriber?.email) {
-          subscriberEmail = subscriber.email;
-          console.log('✅ Email trouvé dans Airtable:', subscriberEmail);
-        } else {
-          console.log('❌ Abonné trouvé dans Airtable mais sans email:', subscriber);
-        }
-      }
-
-      // 4. Vérification finale
-      if (!subscriberEmail) {
-        console.log('❌ Aucun email trouvé pour:', currentTicket.subscriberId);
-        console.log('📋 Abonnés disponibles:', subscribers.map(s => ({ nom: s.nom, prenom: s.prenom, email: s.email, contrat: s.contratAbonne })));
-        
-        alert(`Impossible de trouver l'email de l'abonné "${currentTicket.subscriberId}". 
-        
-Vérifiez que :
-- L'email est présent dans Airtable pour cet abonné
-- Le nom de l'abonné correspond exactement
-- Ou utilisez votre client email habituel`);
         setSendingComment(false);
         return;
       }
@@ -172,17 +137,18 @@ Ticket #${currentTicket.id} - ${currentTicket.title}
 Statut: ${currentTicket.status}
 Priorité: ${currentTicket.priority}`;
 
-      console.log('📧 Envoi email vers:', subscriberEmail);
+      console.log('📧 Envoi email vers:', finalEmail);
       console.log('📧 Sujet:', subject);
       
       // Envoyer l'email via Gmail (nouveau email, pas une réponse)
-      await gmailService.sendEmail(subscriberEmail, subject, emailBody);
+      await gmailService.sendEmail(finalEmail, subject, emailBody);
       
       // Ajouter aussi un commentaire au ticket
-      await addComment(currentTicket.id, `📧 Email envoyé à ${subscriberEmail} :\n\nSujet: ${subject}\n\n${newComment}`);
+      await addComment(currentTicket.id, `📧 Email envoyé à ${finalEmail} :\n\nSujet: ${subject}\n\n${newComment}`);
       
       setNewComment('');
       setEmailSubject('');
+      setEmailRecipient('');
       setCommentType('comment');
       alert('Email envoyé avec succès !');
       
@@ -199,6 +165,50 @@ Priorité: ${currentTicket.priority}`;
       setSendingComment(false);
     }
   };
+
+  // Fonction pour détecter automatiquement l'email de l'abonné
+  const detectSubscriberEmail = () => {
+    console.log('🔍 Recherche email pour abonné:', currentTicket.subscriberId);
+    
+    // 1. D'abord, chercher un email directement dans le subscriberId (format "Nom <email@domain.com>")
+    const emailInSubscriberIdMatch = currentTicket.subscriberId?.match(/<([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})>/);
+    if (emailInSubscriberIdMatch) {
+      console.log('✅ Email trouvé dans subscriberId (format <email>):', emailInSubscriberIdMatch[1]);
+      return emailInSubscriberIdMatch[1];
+    }
+    
+    // 2. Si pas trouvé, chercher un email simple dans le subscriberId
+    const emailMatch = currentTicket.subscriberId?.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+    if (emailMatch) {
+      console.log('✅ Email trouvé dans subscriberId (format simple):', emailMatch[1]);
+      return emailMatch[1];
+    }
+    
+    // 3. Si toujours pas trouvé, chercher dans les abonnés Airtable
+    console.log('🔍 Recherche dans Airtable...');
+    const subscriber = subscribers.find(sub => 
+      currentTicket.subscriberId?.includes(sub.contratAbonne) || 
+      currentTicket.subscriberId?.includes(`${sub.prenom} ${sub.nom}`) ||
+      currentTicket.subscriberId?.includes(sub.nom) ||
+      currentTicket.subscriberId?.includes(sub.prenom)
+    );
+    
+    if (subscriber?.email) {
+      console.log('✅ Email trouvé dans Airtable:', subscriber.email);
+      return subscriber.email;
+    }
+    
+    console.log('❌ Aucun email trouvé pour:', currentTicket.subscriberId);
+    return '';
+  };
+
+  // Détecter l'email automatiquement quand on passe en mode email
+  React.useEffect(() => {
+    if (commentType === 'email' && !emailRecipient) {
+      const detectedEmail = detectSubscriberEmail();
+      setEmailRecipient(detectedEmail);
+    }
+  }, [commentType, currentTicket.subscriberId, subscribers]);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -463,6 +473,36 @@ Priorité: ${currentTicket.priority}`;
                           📧 Email sera envoyé depuis <strong>abonne@sunlib.fr</strong> vers l'abonné concerné par ce ticket.
                         </p>
                       </div>
+                      
+                      <div className="mb-3">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Destinataire *
+                        </label>
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="email"
+                            value={emailRecipient}
+                            onChange={(e) => setEmailRecipient(e.target.value)}
+                            placeholder="adresse@email.com"
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const detectedEmail = detectSubscriberEmail();
+                              setEmailRecipient(detectedEmail);
+                            }}
+                            className="px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition-colors text-sm"
+                            title="Détecter automatiquement l'email"
+                          >
+                            🔍 Auto
+                          </button>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Email détecté automatiquement ou saisissez manuellement
+                        </p>
+                      </div>
+                      
                       <input
                         type="text"
                         value={emailSubject}
@@ -506,7 +546,7 @@ Priorité: ${currentTicket.priority}`;
                     </div>
                     <button
                       onClick={handleAddComment}
-                      disabled={!newComment.trim() || sendingComment}
+                      disabled={!newComment.trim() || sendingComment || (commentType === 'email' && !emailRecipient.trim())}
                       className={`px-4 py-2 rounded-lg transition-colors text-white ${
                         commentType === 'email'
                           ? 'bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300'
