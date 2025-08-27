@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, Search } from 'lucide-react';
 import { useAirtable } from '../../hooks/useAirtable';
 import { useTickets } from '../../hooks/useTickets';
 import { useSupabaseUsers } from '../../hooks/useSupabaseUsers';
@@ -32,9 +32,33 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
 
   const [isManualEntry, setIsManualEntry] = useState(false);
   const [selectedSubscriber, setSelectedSubscriber] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [filteredSubscribers, setFilteredSubscribers] = useState(subscribers);
 
   // Vérifier si Airtable est disponible
   const isAirtableAvailable = initialized && subscribers.length > 0 && !airtableError;
+
+  // Filtrer les abonnés selon le terme de recherche
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setFilteredSubscribers(subscribers);
+    } else {
+      const filtered = subscribers.filter(subscriber => {
+        const fullName = `${subscriber.prenom} ${subscriber.nom}`.toLowerCase();
+        const contract = subscriber.contratAbonne.toLowerCase();
+        const email = subscriber.email?.toLowerCase() || '';
+        const company = subscriber.nomEntreprise?.toLowerCase() || '';
+        const search = searchTerm.toLowerCase();
+        
+        return fullName.includes(search) || 
+               contract.includes(search) || 
+               email.includes(search) ||
+               company.includes(search);
+      });
+      setFilteredSubscribers(filtered);
+    }
+  }, [searchTerm, subscribers]);
 
   useEffect(() => {
     console.log('TicketForm: Chargement des abonnés...');
@@ -43,22 +67,45 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
     console.log('- Erreur Airtable:', airtableError);
   }, [subscribers, initialized, airtableError]);
 
-  const handleSubscriberChange = (value: string) => {
-    if (value === 'manual') {
-      setIsManualEntry(true);
+  const handleSubscriberSelect = (subscriber: any) => {
+    setSelectedSubscriber(subscriber.id);
+    setSearchTerm(`${subscriber.prenom} ${subscriber.nom} - ${subscriber.contratAbonne}`);
+    setFormData(prev => ({
+      ...prev,
+      subscriberId: `${subscriber.prenom} ${subscriber.nom} - ${subscriber.contratAbonne}`
+    }));
+    setShowDropdown(false);
+    setIsManualEntry(false);
+  };
+
+  const handleManualEntry = () => {
+    setIsManualEntry(true);
+    setSelectedSubscriber('');
+    setSearchTerm('');
+    setFormData(prev => ({ ...prev, subscriberId: '' }));
+    setShowDropdown(false);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    setShowDropdown(value.length > 0 && !isManualEntry);
+    
+    // Si l'utilisateur efface tout, réinitialiser
+    if (!value.trim()) {
       setSelectedSubscriber('');
       setFormData(prev => ({ ...prev, subscriberId: '' }));
+    }
+  };
+
+  const toggleManualEntry = () => {
+    if (isManualEntry) {
+      // Retour au mode recherche
+      setIsManualEntry(true);
+      setSelectedSubscriber('');
+      setSearchTerm('');
     } else {
-      setIsManualEntry(false);
-      setSelectedSubscriber(value);
-      
-      const subscriber = subscribers.find(s => s.id === value);
-      if (subscriber) {
-        setFormData(prev => ({
-          ...prev,
-          subscriberId: `${subscriber.prenom} ${subscriber.nom} - ${subscriber.contratAbonne}`
-        }));
-      }
+      // Passage au mode manuel
+      handleManualEntry();
     }
   };
 
@@ -164,21 +211,67 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
                       ✅ {subscribers.length} abonnés disponibles depuis Airtable
                     </p>
                   </div>
-                  <select
-                    value={selectedSubscriber || (isManualEntry ? 'manual' : '')}
-                    onChange={(e) => handleSubscriberChange(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-                    required={!isManualEntry}
+                  
+                  {!isManualEntry ? (
+                    <div className="relative">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        <input
+                          type="text"
+                          value={searchTerm}
+                          onChange={(e) => handleSearchChange(e.target.value)}
+                          onFocus={() => setShowDropdown(searchTerm.length > 0)}
+                          className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                          placeholder="Rechercher un abonné (nom, prénom, contrat, email...)"
+                          required={!isManualEntry}
+                        />
+                      </div>
+                      
+                      {/* Dropdown des résultats */}
+                      {showDropdown && filteredSubscribers.length > 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                          {filteredSubscribers.slice(0, 10).map((subscriber) => (
+                            <button
+                              key={subscriber.id}
+                              type="button"
+                              onClick={() => handleSubscriberSelect(subscriber)}
+                              className="w-full px-4 py-3 text-left hover:bg-orange-50 focus:bg-orange-50 focus:outline-none border-b border-gray-100 last:border-b-0"
+                            >
+                              <div className="font-medium text-gray-900">
+                                {subscriber.prenom} {subscriber.nom}
+                              </div>
+                              <div className="text-sm text-gray-600">
+                                {subscriber.contratAbonne}
+                                {subscriber.email && ` • ${subscriber.email}`}
+                                {subscriber.nomEntreprise && ` • ${subscriber.nomEntreprise}`}
+                              </div>
+                            </button>
+                          ))}
+                          {filteredSubscribers.length > 10 && (
+                            <div className="px-4 py-2 text-sm text-gray-500 bg-gray-50">
+                              ... et {filteredSubscribers.length - 10} autres résultats
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* Message si aucun résultat */}
+                      {showDropdown && searchTerm && filteredSubscribers.length === 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4 text-center text-gray-500">
+                          Aucun abonné trouvé pour "{searchTerm}"
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
+                  
+                  {/* Bouton pour basculer entre recherche et saisie manuelle */}
+                  <button
+                    type="button"
+                    onClick={handleManualEntry}
+                    className="w-full px-4 py-2 text-sm text-orange-600 hover:text-orange-700 hover:bg-orange-50 border border-orange-200 rounded-lg transition-colors"
                   >
-                    <option value="">Sélectionner un abonné</option>
-                    {subscribers.map((subscriber) => (
-                      <option key={subscriber.id} value={subscriber.id}>
-                        {subscriber.prenom} {subscriber.nom} - {subscriber.contratAbonne}
-                        {subscriber.email && ` (${subscriber.email})`}
-                      </option>
-                    ))}
-                    <option value="manual">➕ Saisie manuelle</option>
-                  </select>
+                    ➕ Saisie manuelle (client non répertorié)
+                  </button>
                 </div>
               ) : (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
@@ -198,18 +291,36 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
               {/* Saisie manuelle ou Airtable non disponible */}
               {(isManualEntry || !isAirtableAvailable) && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    <User className="w-4 h-4 inline mr-1" />
-                    Nom de l'abonné *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.subscriberId}
-                    onChange={(e) => setFormData(prev => ({ ...prev, subscriberId: e.target.value }))}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-                    placeholder="Nom de l'abonné ou numéro de contrat"
-                    required
-                  />
+                  <div className="space-y-3">
+                    {isAirtableAvailable && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsManualEntry(false);
+                          setSearchTerm('');
+                          setFormData(prev => ({ ...prev, subscriberId: '' }));
+                        }}
+                        className="text-sm text-orange-600 hover:text-orange-700 underline"
+                      >
+                        ← Retour à la recherche d'abonnés
+                      </button>
+                    )}
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <User className="w-4 h-4 inline mr-1" />
+                        Nom de l'abonné *
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.subscriberId}
+                        onChange={(e) => setFormData(prev => ({ ...prev, subscriberId: e.target.value }))}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                        placeholder="Nom de l'abonné ou numéro de contrat"
+                        required
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
