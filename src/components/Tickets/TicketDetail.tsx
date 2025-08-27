@@ -416,8 +416,8 @@ Priorité: ${currentTicket.priority}`;
                     <span className="text-sm font-medium text-gray-900">
                       {currentTicket.subscriberId}
                     </span>
-                  </div>
-                  {subscriber?.lienCRM && (
+                  {/* Fiche CRM - seulement si abonné Airtable avec lien CRM et pas "autre -" */}
+                  {subscriber?.lienCRM && !currentTicket.subscriberId.toLowerCase().includes('autre -') && (
                     <div className="flex items-center justify-between py-2 border-b border-gray-100">
                       <span className="text-sm text-gray-600">Fiche CRM</span>
                       <a
