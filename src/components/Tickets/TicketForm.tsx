@@ -35,6 +35,7 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [filteredSubscribers, setFilteredSubscribers] = useState(subscribers);
+  const [localForceUpdate, setLocalForceUpdate] = useState(0);
 
   // Vérifier si Airtable est disponible
   const isAirtableAvailable = initialized && subscribers.length > 0 && !airtableError;
@@ -64,8 +65,8 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
         currentInitialized: initialized
       });
       
-      // Déclencher un re-render complet du composant
-      setFormData(prev => ({ ...prev }));
+      // Forcer un re-render complet du composant
+      setLocalForceUpdate(prev => prev + 1);
       
       // Forcer une nouvelle évaluation de isAirtableAvailable
       setTimeout(() => {
@@ -73,7 +74,8 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
           subscribersLength: subscribers.length,
           initialized,
           hasError: !!airtableError,
-          isAvailable: initialized && subscribers.length > 0 && !airtableError
+          isAvailable: initialized && subscribers.length > 0 && !airtableError,
+          localForceUpdate
         });
       }, 100);
     };
@@ -82,7 +84,7 @@ const TicketForm: React.FC<TicketFormProps> = ({ onClose, onSuccess }) => {
     return () => {
       window.removeEventListener('airtable-data-updated', handleAirtableUpdate as EventListener);
     };
-  }, [subscribers.length, initialized, airtableError]);
+  }, [subscribers.length, initialized, airtableError, localForceUpdate]);
 
   // Filtrer les abonnés selon le terme de recherche
   useEffect(() => {
